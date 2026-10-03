@@ -1,0 +1,40 @@
+import type { Expediente } from '../types/expediente';
+
+// Todos estos registros son inventados. Nunca se usan como datos reales de alumnos.
+export const demoExpedientes: Expediente[] = [
+  {
+    id: 'demo-001', nombre: 'Camila Rojas Méndez', rut: '11.111.111-1', anioEgreso: 2025,
+    semestreEgreso: 2, fechaExamen: '2026-10-15', notaExamen: 6.3,
+    comision: { guia: 'María Fuentes', informante1: 'Carlos Vega', informante2: 'Paula Torres' },
+    colegiatura: 'al-dia', fechaColegiatura: '2026-09-25', historialColegiatura: [],
+    acta: { nombre: 'acta-camila-demo.pdf', ruta: 'demo/no-disponible', fechaCarga: '2026-09-28' },
+    fechaCreacion: '2026-09-12', creadoPor: 'Equipo demo'
+  },
+  {
+    id: 'demo-002', nombre: 'Diego Morales Pérez', rut: '22.222.222-2', anioEgreso: 2025,
+    semestreEgreso: 2, fechaExamen: '2026-10-22', colegiatura: 'no-al-dia',
+    fechaColegiatura: '2026-09-29', historialColegiatura: [], fechaCreacion: '2026-09-15', creadoPor: 'Equipo demo'
+  },
+  {
+    id: 'demo-003', nombre: 'Valentina Soto Araya', rut: '33.333.333-3', anioEgreso: 2026,
+    semestreEgreso: 1, fechaExamen: '2026-11-04', colegiatura: 'sin-informar',
+    historialColegiatura: [], fechaCreacion: '2026-09-19', creadoPor: 'Equipo demo'
+  },
+  {
+    id: 'demo-004', nombre: 'Tomás Herrera Díaz', rut: '44.444.444-4', anioEgreso: 2024,
+    semestreEgreso: 2, fechaExamen: '2026-10-28', notaExamen: 5.8,
+    colegiatura: 'al-dia', fechaColegiatura: '2026-09-24', historialColegiatura: [],
+    fechaCreacion: '2026-09-21', creadoPor: 'Equipo demo'
+  },
+  {
+    id: 'demo-005', nombre: 'Fernanda Castro León', rut: '55.555.555-5', anioEgreso: 2026,
+    semestreEgreso: 1, fechaExamen: '2026-11-13', colegiatura: 'sin-informar',
+    historialColegiatura: [], fechaCreacion: '2026-09-23', creadoPor: 'Equipo demo'
+  },
+  {
+    id: 'demo-006', nombre: 'Sebastián Vidal Muñoz', rut: '66.666.666-6', anioEgreso: 2025,
+    semestreEgreso: 1, fechaExamen: '2026-10-09', notaExamen: 6.0,
+    colegiatura: 'al-dia', fechaColegiatura: '2026-09-22', historialColegiatura: [],
+    fechaCreacion: '2026-09-25', creadoPor: 'Equipo demo'
+  }
+];
