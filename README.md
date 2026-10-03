@@ -24,6 +24,8 @@ Abra la dirección que muestra Vite. Si no existe `.env`, ingrese con `demo@adva
 
 La configuración web no es una contraseña. La protección efectiva está en las reglas de Firestore y Storage y en la gestión de usuarios autorizados. El modo de demostración se activa únicamente si faltan los valores de Firebase.
 
+`package.json` fija `@grpc/grpc-js` en la versión corregida 1.14.5 porque Firestore incluye una versión antigua de ese paquete para Node. Aunque esta app se ejecuta en el navegador, npm también revisa esa dependencia al instalar. Para mantener el proyecto seguro, actualice dependencias con cuidado y compruebe `npm audit` y `npm run build`; evite `npm audit fix --force` sin revisar los cambios.
+
 ## Mapa simple del código
 
 | Archivo | Para qué sirve | Qué cambiar durante la evaluación |
