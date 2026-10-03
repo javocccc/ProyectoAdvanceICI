@@ -1,5 +1,5 @@
 /** Los tres estados que Dirección puede registrar manualmente. */
-export type EstadoColegiatura = 'al-dia' | 'no-al-dia' | 'sin-informar';
+export type EstadoColegiatura = "al-dia" | "no-al-dia" | "sin-informar";
 
 /** Los nombres de la comisión se guardan juntos para evitar campos dispersos. */
 export interface Comision {
@@ -46,5 +46,5 @@ export interface Expediente {
 /** Se usa al crear una ficha; el id y las fechas se añaden al guardar. */
 export type NuevoExpediente = Omit<
   Expediente,
-  'id' | 'fechaCreacion' | 'creadoPor' | 'historialColegiatura'
+  "id" | "fechaCreacion" | "creadoPor" | "historialColegiatura"
 >;

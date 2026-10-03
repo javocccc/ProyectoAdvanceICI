@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Solo una cuenta autenticada con rol direccion puede leer o modificar fichas.
+    function esDireccion() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'direccion';
+    }
+
+    match /expedientes/{id} {
+      allow read, write: if esDireccion();
+    }
+
+    match /usuarios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Crear este documento manualmente en la consola Firebase.
+    }
+  }
+}
