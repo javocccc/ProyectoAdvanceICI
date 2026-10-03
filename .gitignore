@@ -17,3 +17,12 @@ context_extract.txt
 inspect_context.ps1
 Contexto/
 *.log
+
+# Material para enviar por correo; se conserva solo en este computador.
+DESIGN.md
+PRODUCT.md
+README.md
+GUIA_EQUIPO.md
+Guia_trabajo_y_commits_Advance_ICI.docx
+generate_guide_zip.ps1
+guia/
