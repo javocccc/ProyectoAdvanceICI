@@ -23,6 +23,10 @@ El repositorio público del grupo ya existe: https://github.com/javocccc/Proyect
 
 Cada compañero clona con `git clone https://github.com/javocccc/ProyectoAdvanceICI.git`, entra con `cd ProyectoAdvanceICI` y crea su rama: `git switch -c feat/matias-registro` o `git switch -c feat/fabian-ficha`. Antes de trabajar, ejecuta `npm install` y `npm run dev`. Para cada cambio revisa `git status`, usa `git add RUTA_DEL_ARCHIVO` y luego `git commit -m "mensaje concreto"`. No use `git add .` sin revisar qué se incluirá. Al terminar sube con `git push -u origin NOMBRE_RAMA` y abre un pull request hacia `main`.
 
+El código final probado para cada módulo está dentro de este Word y en `guia/fuentes/matias` y `guia/fuentes/fabian` del repositorio. `main` conserva las páginas iniciales para que cada integrante construya su parte en su propia rama. La secuencia de diez puntos de las secciones 5 y 6 indica qué parte añadir y guardar en cada commit. Copiar todos los archivos finales de una vez y luego crear commits vacíos no cumple el requisito de diez cambios reales.
+
+Las pruebas de compilación se hicieron en copias separadas de `main` y con ambos módulos juntos. Cada integrante debe repetir `npm run build` en su computador y probar los casos de su lista antes del pull request. En modo demostración, `localStorage` y `sessionStorage` son locales de cada navegador. Cuando Firebase esté conectado, las cuentas y los datos ficticios de prueba se compartirán mediante ese proyecto.
+
 Javier revisa que el pull request compile con `npm run build`, que la página funcione, que el autor tenga sus diez commits y que no haya `.env` ni datos reales. Integra primero el trabajo de Matias y después el de Fabian, actualizando la rama de Fabian desde `main` si fuera necesario. La fusión debe hacerse en GitHub con el pull request visible para que quede registro del trabajo. No hacer `force push` a `main`.
 
 ## 4 Commits de Javier
@@ -41,6 +45,7 @@ Los mensajes siguientes corresponden a cambios ya construidos en la base. Se con
 10. `docs: explicar instalacion, Firebase y trabajo en equipo` — README, reglas y esta guía Word.
 11. `fix: actualizar Firebase y corregir dependencia gRPC` — resuelve las alertas de `npm audit`.
 12. `docs: publicar enlace GitHub y preparar reglas de actas` — agrega el enlace real y permite borrar un acta reemplazada en Storage.
+13. `docs: entregar codigo probado y guia Word del equipo` — publica los archivos de referencia y este Word ampliado.
 
 ## 5 Los diez commits de Matias
 
@@ -59,6 +64,8 @@ Rama `feat/matias-registro`. Archivo principal: `src/pages/NuevoExpedientePage.t
 
 Antes del pull request, Matias debe probar RUT inválido, campos vacíos, nota fuera de rango, docente repetido, RUT duplicado y guardado correcto. Debe verificar que la ficha recién creada muestra los datos.
 
+Código exacto al final del Word: `src/utils/rut.ts`, `src/pages/NuevoExpedientePage.tsx` y `src/pages/NuevoExpedientePage.css`. La función `validar()` agrupa las reglas de los commits 2 a 5; `guardar()` reúne los commits 6 a 8. Cada bloque tiene comentarios para localizarlo con rapidez.
+
 ## 6 Los diez commits de Fabian
 
 Rama `feat/fabian-ficha`. Archivo principal: `src/pages/ExpedienteDetallePage.tsx`. Puede crear `src/pages/ExpedienteDetallePage.css`, `src/components/EstadoColegiaturaForm.tsx` y `src/services/actas.ts`. Debe usar `actualizarExpediente()` y los tipos compartidos. La subida real del PDF usa Firebase Storage; en demostración debe explicar con claridad que el archivo no queda respaldado en un servidor.
@@ -76,9 +83,13 @@ Rama `feat/fabian-ficha`. Archivo principal: `src/pages/ExpedienteDetallePage.ts
 
 Antes del pull request, Fabian debe probar las tres opciones de colegiatura, cancelar sin guardar, error de guardado, PDF inválido, PDF mayor de 10 MB, progreso, reemplazo y vista móvil. La subida real se verifica solo cuando el proyecto Firebase esté configurado.
 
+Código exacto al final del Word: `src/services/actas.ts`, `src/pages/ExpedienteDetallePage.tsx` y `src/pages/ExpedienteDetallePage.css`. `guardarColegiatura()` corresponde a los commits 2 a 4; `validarActa()`, `subirActa()` y las acciones de la ficha cubren los commits 5 a 8.
+
 ## 7 Firebase y datos de demostración
 
 Mientras no exista `.env`, `src/services/firebase.ts` devuelve servicios nulos. `AuthContext` permite únicamente las credenciales ficticias mostradas en la pantalla; `sessionStorage` conserva esa sesión durante la pestaña. `src/services/expedientes.ts` usa `localStorage` para guardar los expedientes ficticios del navegador. No es un mecanismo de seguridad ni respaldo.
+
+Al preparar esta guía, el proyecto Firebase todavía no estaba creado. La compilación y las validaciones locales se comprobaron, pero el inicio de sesión real, Firestore, las reglas publicadas y la subida de PDF no se pueden dar por probados hasta completar la configuración. Esa prueba debe hacerse con cuentas y expedientes ficticios.
 
 Cuando Javier cree Firebase: habilita Authentication por correo y contraseña y Firestore; copia `.env.example` a `.env`; agrega los seis valores de configuración web; publica las reglas; crea una cuenta de Dirección; y crea en Firestore `usuarios/UID` con `rol: direccion`. Entonces el login y los expedientes usan Firebase. Cloud Storage requiere el plan Blaze; si decide activarlo, habilita Storage y publica `storage.rules`. Las pruebas con PDFs deben hacerse con archivos inventados.
 

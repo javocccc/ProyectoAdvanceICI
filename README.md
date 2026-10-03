@@ -52,6 +52,6 @@ La configuración web no es una contraseña. La protección efectiva está en la
 
 ## Trabajo en equipo
 
-Javier mantiene `App.tsx`, `styles.css`, los tipos compartidos y los servicios. Matias trabaja principalmente en `NuevoExpedientePage.tsx` y validaciones del formulario. Fabian trabaja principalmente en `ExpedienteDetallePage.tsx`, historial de colegiatura y actas. La guía Word del proyecto detalla los diez commits sugeridos para cada integrante, los comandos Git y la integración de ramas.
+Javier mantiene `App.tsx`, `styles.css`, los tipos compartidos y los servicios. Matias trabaja principalmente en `NuevoExpedientePage.tsx` y validaciones del formulario. Fabian trabaja principalmente en `ExpedienteDetallePage.tsx`, historial de colegiatura y actas. La guía Word del proyecto incluye el código completo probado de ambos módulos, los diez commits sugeridos para cada compañero, los comandos Git y la integración de ramas. Los mismos archivos finales están en `guia/fuentes`. Esos archivos no activan las funciones en `main`: cada integrante las implementa y registra en su propia rama.
 
 Los archivos originales de `Contexto/` están excluidos del repositorio público porque contienen datos personales y material de clases. Tampoco se publica `.env`.
