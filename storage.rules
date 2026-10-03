@@ -8,9 +8,10 @@ service firebase.storage {
 
     match /actas/{expedienteId}/{nombreArchivo} {
       allow read: if esDireccion();
-      allow write: if esDireccion()
+      allow create, update: if esDireccion()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType == 'application/pdf';
+      allow delete: if esDireccion();
     }
   }
 }

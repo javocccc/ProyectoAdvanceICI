@@ -1,5 +1,7 @@
 # Advance ICI
 
+Repositorio del equipo: https://github.com/javocccc/ProyectoAdvanceICI
+
 Panel de gestión de expedientes de titulación para el proyecto académico del Programa Advance de Ingeniería Civil Industrial. Esta primera versión contiene el acceso, el panel principal, búsqueda, una ficha de lectura y un formulario base. Los registros que aparecen sin Firebase son completamente ficticios.
 
 ## Ejecutar el proyecto
@@ -21,6 +23,8 @@ Abra la dirección que muestra Vite. Si no existe `.env`, ingrese con `demo@adva
 4. Publique `firestore.rules` y `storage.rules` en la consola o mediante Firebase CLI.
 5. Cree una cuenta autorizada en Authentication. En Firestore, cree `usuarios/<uid>` con el campo `rol` igual a `direccion` para ese usuario. El UID debe coincidir exactamente con el de Authentication.
 6. Al ingresar con esa cuenta, la aplicación consultará la colección `expedientes`. Comenzará vacía hasta registrar expedientes. Nunca cargue los datos ficticios como si fueran datos reales.
+
+Cloud Storage para Firebase requiere el plan Blaze. Si aún no se habilita, el registro y la ficha pueden probarse con datos ficticios en modo demostración; la subida real de actas queda pendiente hasta configurar Storage.
 
 La configuración web no es una contraseña. La protección efectiva está en las reglas de Firestore y Storage y en la gestión de usuarios autorizados. El modo de demostración se activa únicamente si faltan los valores de Firebase.
 

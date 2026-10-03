@@ -1,6 +1,6 @@
 # Guía de trabajo y commits Advance ICI
 
-Esta guía es para Javier Carrasco, Matias Olivares y Fabian Silva. La primera entrega evalúa el frontend del sistema de expedientes de titulación. Javier entrega la base, coordina las ramas y revisa los pull requests. Matias completa el registro de expedientes. Fabian completa la ficha, la colegiatura y el acta. Cada integrante debe realizar al menos diez commits propios con cambios reales, usando su propia cuenta y configuración Git. Los diez commits de Javier ya están preparados en la rama principal local; no deben atribuirse a otra persona.
+Esta guía es para Javier Carrasco, Matias Olivares y Fabian Silva. La primera entrega evalúa el frontend del sistema de expedientes de titulación. Javier entrega la base, coordina las ramas y revisa los pull requests. Matias completa el registro de expedientes. Fabian completa la ficha, la colegiatura y el acta. Cada integrante debe realizar al menos diez commits propios con cambios reales, usando su propia cuenta y configuración Git. Javier ya publicó sus commits en `main`; no deben atribuirse a otra persona.
 
 ## 1 Alcance común
 
@@ -19,15 +19,15 @@ No se deben subir datos reales de estudiantes, contraseñas, el archivo `.env` n
 
 ## 3 Git y GitHub paso a paso
 
-Javier entra a GitHub, selecciona **New repository**, escribe `AdvanceICI`, elige **Public** y deja sin marcar README, `.gitignore` y licencia porque esos archivos ya están aquí. En la carpeta local ejecuta `git remote add origin URL_DEL_REPOSITORIO` y `git push -u origin main`. Comparte la URL con el grupo e invita a Matias y Fabian como colaboradores. La carpeta `Contexto` está excluida con `.gitignore` por contener material de clases y datos personales.
+El repositorio público del grupo ya existe: https://github.com/javocccc/ProyectoAdvanceICI. Javier administra `main` e invita a Matias y Fabian como colaboradores. La carpeta `Contexto` está excluida con `.gitignore` por contener material de clases y datos personales.
 
-Cada compañero clona la URL y crea su rama: `git clone URL`, `cd AdvanceICI`, `git switch -c feat/matias-registro` o `git switch -c feat/fabian-ficha`. Antes de trabajar, ejecuta `npm install` y `npm run dev`. Para cada cambio revisa `git status`, usa `git add RUTA_DEL_ARCHIVO` y luego `git commit -m "mensaje concreto"`. No use `git add .` sin revisar qué se incluirá. Al terminar sube con `git push -u origin NOMBRE_RAMA` y abre un pull request hacia `main`.
+Cada compañero clona con `git clone https://github.com/javocccc/ProyectoAdvanceICI.git`, entra con `cd ProyectoAdvanceICI` y crea su rama: `git switch -c feat/matias-registro` o `git switch -c feat/fabian-ficha`. Antes de trabajar, ejecuta `npm install` y `npm run dev`. Para cada cambio revisa `git status`, usa `git add RUTA_DEL_ARCHIVO` y luego `git commit -m "mensaje concreto"`. No use `git add .` sin revisar qué se incluirá. Al terminar sube con `git push -u origin NOMBRE_RAMA` y abre un pull request hacia `main`.
 
 Javier revisa que el pull request compile con `npm run build`, que la página funcione, que el autor tenga sus diez commits y que no haya `.env` ni datos reales. Integra primero el trabajo de Matias y después el de Fabian, actualizando la rama de Fabian desde `main` si fuera necesario. La fusión debe hacerse en GitHub con el pull request visible para que quede registro del trabajo. No hacer `force push` a `main`.
 
-## 4 Los diez commits de Javier
+## 4 Commits de Javier
 
-Los mensajes siguientes corresponden a cambios ya construidos en la base. Se deben conservar como commits separados en Git, con Javier como autor configurado en su computador.
+Los mensajes siguientes corresponden a cambios ya construidos en la base. Se conservan como commits separados en Git, con Javier como autor configurado en su computador. El mínimo solicitado es diez; Javier tiene commits adicionales de mantenimiento y seguridad.
 
 1. `chore: iniciar proyecto React y TypeScript` — configuración Vite, TypeScript, HTML y exclusiones Git.
 2. `feat: definir modelo de expediente y datos ficticios` — interfaces y registros de demostración.
@@ -39,6 +39,8 @@ Los mensajes siguientes corresponden a cambios ya construidos en la base. Se deb
 8. `feat: buscar y filtrar expedientes` — tabla compartida, estado visual y búsqueda.
 9. `feat: agregar formulario y ficha inicial` — páginas base conectadas al servicio.
 10. `docs: explicar instalacion, Firebase y trabajo en equipo` — README, reglas y esta guía Word.
+11. `fix: actualizar Firebase y corregir dependencia gRPC` — resuelve las alertas de `npm audit`.
+12. `docs: publicar enlace GitHub y preparar reglas de actas` — agrega el enlace real y permite borrar un acta reemplazada en Storage.
 
 ## 5 Los diez commits de Matias
 
@@ -78,7 +80,7 @@ Antes del pull request, Fabian debe probar las tres opciones de colegiatura, can
 
 Mientras no exista `.env`, `src/services/firebase.ts` devuelve servicios nulos. `AuthContext` permite únicamente las credenciales ficticias mostradas en la pantalla; `sessionStorage` conserva esa sesión durante la pestaña. `src/services/expedientes.ts` usa `localStorage` para guardar los expedientes ficticios del navegador. No es un mecanismo de seguridad ni respaldo.
 
-Cuando Javier cree Firebase: habilita Authentication por correo y contraseña, Firestore y Storage; copia `.env.example` a `.env`; agrega los seis valores de configuración web; publica las reglas; crea una cuenta de Dirección; y crea en Firestore `usuarios/UID` con `rol: direccion`. Entonces el login y los expedientes usan Firebase. Las pruebas con PDFs deben hacerse con archivos inventados.
+Cuando Javier cree Firebase: habilita Authentication por correo y contraseña y Firestore; copia `.env.example` a `.env`; agrega los seis valores de configuración web; publica las reglas; crea una cuenta de Dirección; y crea en Firestore `usuarios/UID` con `rol: direccion`. Entonces el login y los expedientes usan Firebase. Cloud Storage requiere el plan Blaze; si decide activarlo, habilita Storage y publica `storage.rules`. Las pruebas con PDFs deben hacerse con archivos inventados.
 
 ## 8 Cambios rápidos que pueden pedir en la evaluación
 
