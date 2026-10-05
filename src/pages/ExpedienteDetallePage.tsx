@@ -3,6 +3,7 @@ import type { ChangeEvent, DragEvent, FormEvent } from "react";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
+import { validarActa } from "../services/actas";
 import { actualizarExpediente } from "../services/expedientes";
 import type { Expediente, EstadoColegiatura } from "../types/expediente";
 import { formatearFecha } from "../utils/formato";
@@ -21,15 +22,17 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   const [guardandoEstado, setGuardandoEstado] = useState(false);
   const [errorEstado, setErrorEstado] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [errorActa, setErrorActa] = useState("");
   const { usuario } = useAuth();
 
   useEffect(() => {
-    // Al abrir otra ficha, evita conservar datos temporales del expediente anterior.
+    // Evita arrastrar datos del formulario o del acta al cambiar de expediente.
     setActual(expediente);
     setEstado(expediente.colegiatura);
     setObservacion("");
     setErrorEstado("");
     setArchivo(null);
+    setErrorActa("");
   }, [expediente]);
 
   /** Guarda el estado de colegiatura elegido por Dirección. */
@@ -42,7 +45,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
 
     const fecha = new Date().toISOString();
     const observacionLimpia = observacion.trim();
-    // Cada cambio conserva el historial y agrega quién, cuándo y qué estado registró.
+    // Cada entrada registra el cambio y mantiene intactos los eventos anteriores.
     const historial = [
       ...actual.historialColegiatura,
       {
@@ -75,15 +78,21 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     }
   }
 
-  /** Actualiza el archivo seleccionado, ya sea desde el explorador o arrastrándolo. */
+  /** Actualiza el archivo elegido desde el explorador o la zona de arrastre. */
   function elegirArchivo(nuevo: File | null) {
     setArchivo(nuevo);
+    setErrorActa("");
   }
 
   function soltarArchivo(evento: DragEvent<HTMLLabelElement>) {
     evento.preventDefault();
-    // El navegador entrega los archivos soltados; se toma el primero, igual que en el input.
+    // Usa el primer archivo soltado, igual que el selector de archivos.
     elegirArchivo(evento.dataTransfer.files[0] ?? null);
+  }
+
+  async function comprobarArchivo() {
+    if (!archivo) return;
+    setErrorActa((await validarActa(archivo)) ?? "PDF válido para subir.");
   }
 
   return (
@@ -194,7 +203,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             </form>
 
             <h3>Historial de colegiatura</h3>
-            {/* Si no hay cambios todavía, muestra un estado vacío en vez de una lista vacía. */}
+            {/* Informa cuando el historial está vacío; si no, lista cada cambio registrado. */}
             {actual.historialColegiatura.length === 0 ? (
               <p>Sin cambios registrados.</p>
             ) : (
@@ -234,6 +243,14 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
               />
             </label>
             {archivo && <p>Seleccionado: {archivo.name}</p>}
+            <p role="status">{errorActa}</p>
+            <button
+              type="button"
+              disabled={!archivo}
+              onClick={comprobarArchivo}
+            >
+              Validar PDF
+            </button>
           </section>
         </div>
       </div>
