@@ -1,12 +1,18 @@
-/* COMMIT 7 (borrar después: quitar este bloque antes de git add)
- * Fabián: subir el acta con progreso.
+/* COMMIT 8 (borrar después: quitar este bloque antes de git add)
+ * Fabián: abrir y reemplazar el acta.
  * Copia los archivos de esta carpeta a las rutas src/... indicadas aquí.
- * Archivos: src/pages/ExpedienteDetallePage.tsx src/services/actas.ts.
+ * Archivos: src/services/actas.ts.
  * Después de copiar y borrar este bloque: npm run build.
- * Confirma con tu propia cuenta: git add src/pages/ExpedienteDetallePage.tsx src/services/actas.ts && git commit -m "feat: subir acta con progreso"
+ * Confirma con tu propia cuenta: git add src/services/actas.ts && git commit -m "feat: abrir descargar y reemplazar acta"
  */
 
-import { ref, uploadBytesResumable } from "firebase/storage";
+import {
+  deleteObject,
+  getBlob,
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage";
 import type { Acta } from "../types/expediente";
 import { storage } from "./firebase";
 
@@ -59,3 +65,22 @@ export async function subirActa(
   return { nombre: archivo.name, ruta, fechaCarga: new Date().toISOString() };
 }
 
+/** Solicita una dirección temporal para abrir el PDF en otra pestaña. */
+export async function urlActa(acta: Acta): Promise<string> {
+  if (!storage)
+    throw new Error("El acta de demostración no está respaldada en Firebase.");
+  return getDownloadURL(ref(storage, acta.ruta));
+}
+
+/** Descarga el contenido para que el navegador use el nombre original. */
+export async function blobActa(acta: Acta): Promise<Blob> {
+  if (!storage)
+    throw new Error("El acta de demostración no está respaldada en Firebase.");
+  return getBlob(ref(storage, acta.ruta));
+}
+
+/** Borra copias antiguas después de reemplazar el acta o cancelar una carga. */
+export async function borrarActa(acta: Acta): Promise<void> {
+  if (storage && acta.ruta.startsWith("actas/"))
+    await deleteObject(ref(storage, acta.ruta));
+}
