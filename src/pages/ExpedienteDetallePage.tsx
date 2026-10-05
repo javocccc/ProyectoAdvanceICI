@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, DragEvent, FormEvent } from "react";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
@@ -20,14 +20,16 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   const [observacion, setObservacion] = useState("");
   const [guardandoEstado, setGuardandoEstado] = useState(false);
   const [errorEstado, setErrorEstado] = useState("");
+  const [archivo, setArchivo] = useState<File | null>(null);
   const { usuario } = useAuth();
 
   useEffect(() => {
-    // Al navegar a otra ficha, reinicia también los campos transitorios del formulario.
+    // Al abrir otra ficha, evita conservar datos temporales del expediente anterior.
     setActual(expediente);
     setEstado(expediente.colegiatura);
     setObservacion("");
     setErrorEstado("");
+    setArchivo(null);
   }, [expediente]);
 
   /** Guarda el estado de colegiatura elegido por Dirección. */
@@ -40,7 +42,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
 
     const fecha = new Date().toISOString();
     const observacionLimpia = observacion.trim();
-    // Cada cambio registra el estado anterior y el nuevo junto con quién y cuándo lo hizo.
+    // Cada cambio conserva el historial y agrega quién, cuándo y qué estado registró.
     const historial = [
       ...actual.historialColegiatura,
       {
@@ -71,6 +73,17 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     } finally {
       setGuardandoEstado(false);
     }
+  }
+
+  /** Actualiza el archivo seleccionado, ya sea desde el explorador o arrastrándolo. */
+  function elegirArchivo(nuevo: File | null) {
+    setArchivo(nuevo);
+  }
+
+  function soltarArchivo(evento: DragEvent<HTMLLabelElement>) {
+    evento.preventDefault();
+    // El navegador entrega los archivos soltados; se toma el primero, igual que en el input.
+    elegirArchivo(evento.dataTransfer.files[0] ?? null);
   }
 
   return (
@@ -181,6 +194,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             </form>
 
             <h3>Historial de colegiatura</h3>
+            {/* Si no hay cambios todavía, muestra un estado vacío en vez de una lista vacía. */}
             {actual.historialColegiatura.length === 0 ? (
               <p>Sin cambios registrados.</p>
             ) : (
@@ -204,6 +218,22 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
                 {actual.acta?.nombre ?? "Aún no se adjunta un acta"}
               </span>
             </div>
+
+            <label
+              className="acta-dropzone"
+              onDragOver={(evento) => evento.preventDefault()}
+              onDrop={soltarArchivo}
+            >
+              <span>Seleccione o arrastre un PDF</span>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={(evento: ChangeEvent<HTMLInputElement>) =>
+                  elegirArchivo(evento.target.files?.[0] ?? null)
+                }
+              />
+            </label>
+            {archivo && <p>Seleccionado: {archivo.name}</p>}
           </section>
         </div>
       </div>
