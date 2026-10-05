@@ -14,13 +14,16 @@ interface DetalleProps {
 
 export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   const [actual, setActual] = useState(expediente);
-  const [estado, setEstado] = useState<EstadoColegiatura>(expediente.colegiatura);
+  const [estado, setEstado] = useState<EstadoColegiatura>(
+    expediente.colegiatura,
+  );
   const [observacion, setObservacion] = useState("");
   const [guardandoEstado, setGuardandoEstado] = useState(false);
   const [errorEstado, setErrorEstado] = useState("");
   const { usuario } = useAuth();
 
   useEffect(() => {
+    // Al navegar a otra ficha, reinicia también los campos transitorios del formulario.
     setActual(expediente);
     setEstado(expediente.colegiatura);
     setObservacion("");
@@ -37,7 +40,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
 
     const fecha = new Date().toISOString();
     const observacionLimpia = observacion.trim();
-    // Conserva los cambios previos y agrega la observación solo si tiene contenido.
+    // Cada cambio registra el estado anterior y el nuevo junto con quién y cuándo lo hizo.
     const historial = [
       ...actual.historialColegiatura,
       {
@@ -137,6 +140,12 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
                 : "Sin informar"}
             </p>
 
+            {actual.colegiatura === "no-al-dia" && (
+              <p role="alert" className="form-error">
+                Pago de colegiatura pendiente: verificar antes de continuar.
+              </p>
+            )}
+
             <form onSubmit={guardarColegiatura}>
               <label htmlFor="detalle-estado">Estado de colegiatura</label>
               <select
@@ -172,7 +181,6 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             </form>
 
             <h3>Historial de colegiatura</h3>
-            {/* Muestra un estado vacío cuando aún no hay cambios; si existen, presenta cada uno. */}
             {actual.historialColegiatura.length === 0 ? (
               <p>Sin cambios registrados.</p>
             ) : (
