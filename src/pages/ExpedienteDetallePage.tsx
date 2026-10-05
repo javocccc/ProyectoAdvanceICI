@@ -12,7 +12,6 @@ import {
 } from "../services/actas";
 import { actualizarExpediente } from "../services/expedientes";
 import type {
-  Acta,
   Expediente,
   EstadoColegiatura,
 } from "../types/expediente";
@@ -72,11 +71,12 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     setErrorEstado("");
     setArchivo(null);
     setConfirmarReemplazo(false);
+    setSubiendo(false);
+    setProgreso(0);
     setErrorActa("");
     setMensajeActa("");
-    setProgreso(0);
 
-    // Libera la URL temporal asociada a la ficha anterior al navegar o desmontar.
+    // Cada URL temporal apunta al PDF de una ficha; se libera al cambiar o cerrar.
     return () => {
       if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
       demoUrl.current = null;
@@ -87,8 +87,9 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   async function guardarColegiatura(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (!usuario || guardandoEstado || estado === actual.colegiatura) return;
-
     const expedienteId = actual.id;
+
+    setGuardandoEstado(true);
     setGuardandoEstado(true);
     setErrorEstado("");
     const fecha = new Date().toISOString();
@@ -104,7 +105,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
       },
     ];
     try {
-      await actualizarExpediente(actual.id, {
+      await actualizarExpediente(expedienteId, {
         colegiatura: estado,
         fechaColegiatura: fecha,
         historialColegiatura: historial,
@@ -129,10 +130,13 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
         );
       }
     } finally {
-      setGuardandoEstado(false);
+      if (expedienteVisibleId.current === expedienteId) {
+        setGuardandoEstado(false);
+      }
     }
   }
 
+  /** Prepara el PDF elegido y limpia avisos de una selección anterior. */
   function elegirArchivo(nuevo: File | null) {
     setArchivo(nuevo);
     setConfirmarReemplazo(false);
@@ -145,57 +149,55 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     elegirArchivo(evento.dataTransfer.files[0] ?? null);
   }
 
+  /** Valida el PDF, pide confirmación si reemplaza uno y guarda su referencia. */
   async function guardarArchivo() {
     if (!archivo || subiendo) return;
     const expedienteId = actual.id;
-    const archivoSeleccionado = archivo;
+    const archivoElegido = archivo;
     setErrorActa("");
-    const error = await validarActa(archivoSeleccionado);
+    const error = await validarActa(archivoElegido);
+    if (expedienteVisibleId.current !== expedienteId) return;
     if (error) {
-      if (expedienteVisibleId.current === expedienteId) setErrorActa(error);
+      setErrorActa(error);
       return;
     }
-    // La ficha pudo cambiar durante la validación asíncrona del PDF.
-    if (expedienteVisibleId.current !== expedienteId) return;
     if (actual.acta && !confirmarReemplazo) {
       setConfirmarReemplazo(true);
       return;
     }
     setSubiendo(true);
     setProgreso(0);
-    let actaSubida: Acta | null = null;
+    let subida: Awaited<ReturnType<typeof subirActa>> | null = null;
     try {
-      const nuevaActa = await subirActa(
-        expedienteId,
-        archivoSeleccionado,
-        (porcentaje) => {
-          if (expedienteVisibleId.current === expedienteId) {
-            setProgreso(porcentaje);
-          }
-        },
-      );
-      actaSubida = nuevaActa;
-      await actualizarExpediente(expedienteId, { acta: nuevaActa });
+      subida = await subirActa(expedienteId, archivoElegido, (porcentaje) => {
+        if (expedienteVisibleId.current === expedienteId) {
+          setProgreso(porcentaje);
+        }
+      });
+      await actualizarExpediente(expedienteId, { acta: subida });
       const anterior = actual.acta;
+      const actaGuardada = subida;
       if (expedienteVisibleId.current === expedienteId) {
         setActual((previo) =>
-          previo.id === expedienteId ? { ...previo, acta: nuevaActa } : previo,
+          previo.id === expedienteId
+            ? { ...previo, acta: actaGuardada }
+            : previo,
         );
         if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
-        demoUrl.current = nuevaActa.ruta.startsWith("demo/")
-          ? URL.createObjectURL(archivoSeleccionado)
+        demoUrl.current = actaGuardada.ruta.startsWith("demo/")
+          ? URL.createObjectURL(archivoElegido)
           : null;
         setArchivo((previo) =>
-          previo === archivoSeleccionado ? null : previo,
+          previo === archivoElegido ? null : previo,
         );
         setConfirmarReemplazo(false);
         setMensajeActa(
-          nuevaActa.ruta.startsWith("demo/")
+          actaGuardada.ruta.startsWith("demo/")
             ? "PDF disponible solo mientras mantenga abierta esta ficha. La demostración no respalda archivos."
             : "Acta guardada en Firebase Storage.",
         );
       }
-      // La nueva referencia ya está guardada; un fallo al borrar la anterior no la invalida.
+      // Un fallo al borrar la anterior no invalida el acta nueva ya registrada.
       if (anterior) {
         try {
           await borrarActa(anterior);
@@ -208,27 +210,29 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
         }
       }
     } catch {
-      let errorLimpieza = false;
-      if (actaSubida) {
+      let falloLimpieza = false;
+      if (subida) {
         try {
-          await borrarActa(actaSubida);
+          await borrarActa(subida);
         } catch {
-          errorLimpieza = true;
+          falloLimpieza = true;
         }
       }
       if (expedienteVisibleId.current === expedienteId) {
         setErrorActa(
-          errorLimpieza
-            ? "No se pudo guardar el acta y tampoco se pudo limpiar el archivo subido."
+          falloLimpieza
+            ? "No se pudo guardar el acta ni limpiar el archivo subido."
             : "No se pudo guardar el acta. Revise la conexión e inténtelo nuevamente.",
         );
       }
     } finally {
-      setSubiendo(false);
+      if (expedienteVisibleId.current === expedienteId) {
+        setSubiendo(false);
+      }
     }
   }
 
-  /** Abre una ventana primero para que el navegador no bloquee la operación asíncrona. */
+  /** Abre el acta en otra pestaña cuando hay un archivo disponible. */
   async function abrirArchivo() {
     if (!actual.acta) return;
     setErrorActa("");
@@ -249,6 +253,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     }
   }
 
+  /** Descarga el acta con el nombre que tenía al subirla. */
   async function descargarArchivo() {
     if (!actual.acta) return;
     setErrorActa("");
@@ -374,13 +379,12 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             <h3>Historial de cambios</h3>
             {actual.historialColegiatura.length ? (
               <ol className="historial-lista">
-                {/* Copia antes de invertir para mostrar los cambios recientes primero. */}
                 {[...actual.historialColegiatura]
                   .reverse()
                   .map((cambio, indice) => (
                     <li key={`${cambio.fecha}-${indice}`}>
                       <strong>
-                        {nombreEstadoColegiatura(cambio.estadoNuevo)}
+                                      {nombreEstadoColegiatura(cambio.estadoNuevo)}
                       </strong>
                       <span>
                         {formatearFecha(cambio.fecha)} · {cambio.usuario}
