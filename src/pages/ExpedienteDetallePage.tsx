@@ -3,7 +3,7 @@ import type { ChangeEvent, DragEvent, FormEvent } from "react";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
-import { validarActa } from "../services/actas";
+import { subirActa, validarActa } from "../services/actas";
 import { actualizarExpediente } from "../services/expedientes";
 import type { Expediente, EstadoColegiatura } from "../types/expediente";
 import { formatearFecha } from "../utils/formato";
@@ -23,10 +23,12 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   const [errorEstado, setErrorEstado] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [errorActa, setErrorActa] = useState("");
+  const [subiendo, setSubiendo] = useState(false);
+  const [progreso, setProgreso] = useState(0);
   const { usuario } = useAuth();
 
   useEffect(() => {
-    // Evita arrastrar datos del formulario o del acta al cambiar de expediente.
+    // Al cambiar de ficha, descarta los datos temporales del formulario y del acta.
     setActual(expediente);
     setEstado(expediente.colegiatura);
     setObservacion("");
@@ -45,7 +47,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
 
     const fecha = new Date().toISOString();
     const observacionLimpia = observacion.trim();
-    // Cada entrada registra el cambio y mantiene intactos los eventos anteriores.
+    // Cada entrada conserva el historial y registra quién, cuándo y qué estado cambió.
     const historial = [
       ...actual.historialColegiatura,
       {
@@ -63,7 +65,6 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
         fechaColegiatura: fecha,
         historialColegiatura: historial,
       });
-
       setActual((previo) => ({
         ...previo,
         colegiatura: estado,
@@ -90,9 +91,47 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     elegirArchivo(evento.dataTransfer.files[0] ?? null);
   }
 
+  /** Valida el PDF seleccionado antes de permitir su subida. */
   async function comprobarArchivo() {
     if (!archivo) return;
     setErrorActa((await validarActa(archivo)) ?? "PDF válido para subir.");
+  }
+
+  /** Sube el archivo y guarda su referencia en el expediente. */
+  async function guardarArchivo() {
+    if (!archivo || subiendo) return;
+
+    const expedienteId = actual.id;
+    const archivoSeleccionado = archivo;
+    const error = await validarActa(archivoSeleccionado);
+    if (error) {
+      setErrorActa(error);
+      return;
+    }
+
+    setSubiendo(true);
+    setProgreso(0);
+    setErrorActa("");
+
+    try {
+      const acta = await subirActa(
+        expedienteId,
+        archivoSeleccionado,
+        setProgreso,
+      );
+      await actualizarExpediente(expedienteId, { acta });
+      // Evita aplicar el resultado de una subida anterior a otra ficha abierta.
+      setActual((previo) =>
+        previo.id === expedienteId ? { ...previo, acta } : previo,
+      );
+      setArchivo((previo) =>
+        previo === archivoSeleccionado ? null : previo,
+      );
+    } catch {
+      setErrorActa("No se pudo guardar el acta. Revise la conexión.");
+    } finally {
+      setSubiendo(false);
+    }
   }
 
   return (
@@ -203,7 +242,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             </form>
 
             <h3>Historial de colegiatura</h3>
-            {/* Informa cuando el historial está vacío; si no, lista cada cambio registrado. */}
+            {/* Si no hay cambios, muestra un estado vacío en vez de una lista sin elementos. */}
             {actual.historialColegiatura.length === 0 ? (
               <p>Sin cambios registrados.</p>
             ) : (
@@ -246,11 +285,23 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             <p role="status">{errorActa}</p>
             <button
               type="button"
-              disabled={!archivo}
+              disabled={!archivo || subiendo}
               onClick={comprobarArchivo}
             >
               Validar PDF
             </button>
+            <button
+              type="button"
+              disabled={!archivo || subiendo}
+              onClick={guardarArchivo}
+            >
+              {subiendo ? "Subiendo..." : "Guardar acta"}
+            </button>
+            <progress
+              value={progreso}
+              max={100}
+              aria-label="Progreso de subida"
+            />
           </section>
         </div>
       </div>
