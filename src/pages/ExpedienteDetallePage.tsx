@@ -17,6 +17,7 @@ import type {
   EstadoColegiatura,
 } from "../types/expediente";
 import { formatearFecha } from "../utils/formato";
+import "./ExpedienteDetallePage.css";
 
 interface DetalleProps {
   expediente: Expediente;
