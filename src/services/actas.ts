@@ -1,10 +1,3 @@
-/* COMMIT 8 (borrar después: quitar este bloque antes de git add)
- * Fabián: abrir y reemplazar el acta.
- * Copia los archivos de esta carpeta a las rutas src/... indicadas aquí.
- * Archivos: src/services/actas.ts.
- * Después de copiar y borrar este bloque: npm run build.
- * Confirma con tu propia cuenta: git add src/services/actas.ts && git commit -m "feat: abrir descargar y reemplazar acta"
- */
 
 import {
   deleteObject,
