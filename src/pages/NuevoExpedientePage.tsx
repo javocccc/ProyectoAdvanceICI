@@ -2,9 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
-import { crearExpediente } from "../services/expedientes";
+import { crearExpediente, listarExpedientes } from "../services/expedientes";
 import type { NuevoExpediente } from "../types/expediente";
-import { validarRut } from "../utils/rut";
+import { validarRut, limpiarRut } from "../utils/rut";
 
 interface NuevoProps {
   alGuardar: (id: string) => void;
@@ -66,13 +66,13 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
   const [errores, setErrores] = useState<Errores>({});
   const [errorGeneral, setErrorGeneral] = useState("");
   const [guardando, setGuardando] = useState(false);
-
+  const [idExistente, setIdExistente] = useState<string | null>(null);
 
   function cambiar(campo: Campo, valor: string) {
     setCampos((actual) => ({ ...actual, [campo]: valor }));
     setErrores((actual) => ({ ...actual, [campo]: undefined }));
     setErrorGeneral("");
-
+    setIdExistente(null);
   }
 
   /** Conecta cada input con su etiqueta y con su mensaje de error. */
@@ -99,7 +99,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     const encontrados = validar(campos);
     setErrores(encontrados);
     setErrorGeneral("");
-
+    setIdExistente(null);
     if (Object.keys(encontrados).length) {
 
       return;
@@ -121,7 +121,12 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     } catch (problema) {
       const mensaje = problema instanceof Error ? problema.message : "No fue posible guardar el expediente.";
       setErrorGeneral(mensaje);
-
+      if (mensaje.includes("Ya existe")) {
+        try {
+          const existente = (await listarExpedientes()).find((item) => limpiarRut(item.rut) === limpiarRut(campos.rut));
+          setIdExistente(existente?.id ?? null);
+        } catch { /* El error sigue visible. */ }
+      }
     } finally {
       setGuardando(false);
     }
@@ -159,7 +164,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
           {campoTexto("informante2", "Segundo informante *")}
           {campoTexto("informanteAdicional", "Informante adicional (opcional)")}
         </div>
-        {errorGeneral && <div className="form-error" role="alert">{errorGeneral}</div>}
+        {errorGeneral && <div className="form-error" role="alert">{errorGeneral}{idExistente && <button className="inline-action" type="button" onClick={() => alGuardar(idExistente)}>Abrir expediente existente</button>}</div>}
         <div className="editor-actions">
           <button className="button button-secondary" type="button" onClick={alCancelar}>Cancelar</button>
           <button className="button button-primary" type="submit">
