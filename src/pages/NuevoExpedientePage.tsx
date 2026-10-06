@@ -95,13 +95,13 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
 
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    if (!usuario) return;
+    if (!usuario || guardando) return;
     const encontrados = validar(campos);
     setErrores(encontrados);
     setErrorGeneral("");
     setIdExistente(null);
     if (Object.keys(encontrados).length) {
-
+      document.getElementById(`registro-${Object.keys(encontrados)[0]}`)?.focus();
       return;
     }
     const nuevo: NuevoExpediente = {
@@ -166,8 +166,8 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
         </div>
         {errorGeneral && <div className="form-error" role="alert">{errorGeneral}{idExistente && <button className="inline-action" type="button" onClick={() => alGuardar(idExistente)}>Abrir expediente existente</button>}</div>}
         <div className="editor-actions">
-          <button className="button button-secondary" type="button" onClick={alCancelar}>Cancelar</button>
-          <button className="button button-primary" type="submit">
+          <button className="button button-secondary" type="button" onClick={alCancelar} disabled={guardando}>Cancelar</button>
+          <button className="button button-primary" type="submit" disabled={guardando}>
             {guardando ? "Guardando…" : "Guardar expediente"} <Icon name="arrow" size={18} />
           </button>
         </div>
