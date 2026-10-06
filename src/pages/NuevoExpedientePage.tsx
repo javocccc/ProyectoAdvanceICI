@@ -99,6 +99,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
   const [idExistente, setIdExistente] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
+  /** Actualiza un campo y borra su error sin perder el resto del formulario. */
   function cambiar(campo: Campo, valor: string) {
     setCampos((actual) => ({ ...actual, [campo]: valor }));
     setErrores((actual) => ({ ...actual, [campo]: undefined }));
@@ -106,6 +107,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     setIdExistente(null);
   }
 
+  /** Crea un input unido a su etiqueta y a un mensaje de error accesible. */
   function campoTexto(
     campo: Campo,
     titulo: string,
@@ -138,6 +140,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     );
   }
 
+  /** Valida, guarda mediante el servicio y abre la ficha recién creada. */
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (!usuario || guardando) return;
