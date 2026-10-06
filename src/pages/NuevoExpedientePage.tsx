@@ -4,18 +4,20 @@ import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
 import { crearExpediente, listarExpedientes } from "../services/expedientes";
 import type { NuevoExpediente } from "../types/expediente";
-import { validarRut, limpiarRut } from "../utils/rut";
+import { formatearRut, limpiarRut, validarRut } from "../utils/rut";
+import "./NuevoExpedientePage.css";
 
 interface NuevoProps {
   alGuardar: (id: string) => void;
   alCancelar: () => void;
 }
 
+// Una interfaz reúne todos los valores del formulario en vez de tener un estado por campo.
 interface Campos {
   nombre: string;
   rut: string;
   anio: string;
-  semestre: string;
+  semestre: "1" | "2";
   fechaExamen: string;
   nota: string;
   guia: string;
@@ -40,33 +42,62 @@ const inicial: Campos = {
   informanteAdicional: "",
 };
 
-/** Devuelve un mensaje por cada dato que se debe corregir. */
+/** Cada error apunta a un campo para que la persona pueda corregirlo. */
 function validar(campos: Campos): Errores {
   const errores: Errores = {};
   if (!campos.nombre.trim()) errores.nombre = "Ingrese el nombre completo.";
-  if (!validarRut(campos.rut)) errores.rut = "Revise el RUT y su dígito verificador.";
+  if (!campos.rut.trim()) errores.rut = "Ingrese el RUT.";
+  else if (!validarRut(campos.rut))
+    errores.rut = "Revise el RUT y su dígito verificador.";
   const anio = Number(campos.anio);
   if (!Number.isInteger(anio) || anio < 2000 || anio > 2100)
     errores.anio = "Ingrese un año entre 2000 y 2100.";
-  if (!campos.fechaExamen) errores.fechaExamen = "Seleccione la fecha del examen.";
+  if (!campos.fechaExamen)
+    errores.fechaExamen = "Seleccione la fecha del examen.";
   const nota = Number(campos.nota.replace(",", "."));
   if (!campos.nota.trim()) errores.nota = "Ingrese la nota del examen.";
-  else if (!Number.isFinite(nota) || nota < 1 || nota > 7) errores.nota = "La nota debe estar entre 1,0 y 7,0.";
+  else if (!Number.isFinite(nota) || nota < 1 || nota > 7)
+    errores.nota = "La nota debe estar entre 1,0 y 7,0.";
   if (!campos.guia.trim()) errores.guia = "Ingrese el profesor guía.";
-  if (!campos.informante1.trim()) errores.informante1 = "Ingrese el primer informante.";
-  if (!campos.informante2.trim()) errores.informante2 = "Ingrese el segundo informante.";
-  const docentes = [campos.guia, campos.informante1, campos.informante2, campos.informanteAdicional].map((valor) => valor.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()).filter(Boolean);
-  if (new Set(docentes).size !== docentes.length) errores.guia = "Un docente figura dos veces en la comisión.";
+  if (!campos.informante1.trim())
+    errores.informante1 = "Ingrese el primer informante.";
+  if (!campos.informante2.trim())
+    errores.informante2 = "Ingrese el segundo informante.";
+
+  // La comparación ignora espacios, tildes y mayúsculas.
+  const docentes = (
+    ["guia", "informante1", "informante2", "informanteAdicional"] as const
+  )
+    .map((campo) => ({
+      campo,
+      nombre: campos[campo]
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " "),
+    }))
+    .filter((item) => item.nombre);
+  for (const docente of docentes) {
+    if (
+      docentes.some(
+        (otro) =>
+          otro.campo !== docente.campo && otro.nombre === docente.nombre,
+      )
+    )
+      errores[docente.campo] = "Este docente ya figura en la comisión.";
+  }
   return errores;
 }
 
+/** Formulario completo: React guarda los campos y vuelve a dibujar al escribir. */
 export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
   const { usuario } = useAuth();
   const [campos, setCampos] = useState<Campos>(inicial);
   const [errores, setErrores] = useState<Errores>({});
   const [errorGeneral, setErrorGeneral] = useState("");
-  const [guardando, setGuardando] = useState(false);
   const [idExistente, setIdExistente] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   function cambiar(campo: Campo, valor: string) {
     setCampos((actual) => ({ ...actual, [campo]: valor }));
@@ -75,20 +106,34 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     setIdExistente(null);
   }
 
-  /** Conecta cada input con su etiqueta y con su mensaje de error. */
-  function campoTexto(campo: Campo, titulo: string, tipo = "text") {
+  function campoTexto(
+    campo: Campo,
+    titulo: string,
+    opciones: {
+      placeholder?: string;
+      type?: string;
+      inputMode?: "decimal" | "numeric";
+    } = {},
+  ) {
     return (
       <label key={campo} htmlFor={`registro-${campo}`}>
         {titulo}
         <input
           id={`registro-${campo}`}
-          type={tipo}
+          name={campo}
+          type={opciones.type ?? "text"}
+          inputMode={opciones.inputMode}
+          placeholder={opciones.placeholder}
           value={campos[campo]}
           onChange={(evento) => cambiar(campo, evento.target.value)}
           aria-invalid={Boolean(errores[campo])}
           aria-describedby={errores[campo] ? `error-${campo}` : undefined}
         />
-        {errores[campo] && <span id={`error-${campo}`} className="field-error">{errores[campo]}</span>}
+        {errores[campo] && (
+          <span className="field-error" id={`error-${campo}`}>
+            {errores[campo]}
+          </span>
+        )}
       </label>
     );
   }
@@ -101,31 +146,49 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     setErrorGeneral("");
     setIdExistente(null);
     if (Object.keys(encontrados).length) {
-      document.getElementById(`registro-${Object.keys(encontrados)[0]}`)?.focus();
+      const primero = Object.keys(encontrados)[0];
+      document.getElementById(`registro-${primero}`)?.focus();
       return;
     }
+
+    // Los campos opcionales se omiten cuando están vacíos para que Firestore los acepte.
+    const comision = {
+      guia: campos.guia.trim(),
+      informante1: campos.informante1.trim(),
+      informante2: campos.informante2.trim(),
+      ...(campos.informanteAdicional.trim()
+        ? { informanteAdicional: campos.informanteAdicional.trim() }
+        : {}),
+    };
     const nuevo: NuevoExpediente = {
       nombre: campos.nombre.trim(),
-      rut: campos.rut.trim(),
+      rut: formatearRut(campos.rut),
       anioEgreso: Number(campos.anio),
       semestreEgreso: Number(campos.semestre) as 1 | 2,
       fechaExamen: campos.fechaExamen,
-      colegiatura: "sin-informar",
       notaExamen: Number(campos.nota.replace(",", ".")),
-      comision: { guia: campos.guia.trim(), informante1: campos.informante1.trim(), informante2: campos.informante2.trim(), ...(campos.informanteAdicional.trim() ? { informanteAdicional: campos.informanteAdicional.trim() } : {}) },
+      comision,
+      colegiatura: "sin-informar",
     };
     setGuardando(true);
     try {
       const expediente = await crearExpediente(nuevo, usuario.email);
       alGuardar(expediente.id);
     } catch (problema) {
-      const mensaje = problema instanceof Error ? problema.message : "No fue posible guardar el expediente.";
+      const mensaje =
+        problema instanceof Error
+          ? problema.message
+          : "No fue posible guardar el expediente.";
       setErrorGeneral(mensaje);
       if (mensaje.includes("Ya existe")) {
         try {
-          const existente = (await listarExpedientes()).find((item) => limpiarRut(item.rut) === limpiarRut(campos.rut));
+          const existente = (await listarExpedientes()).find(
+            (item) => limpiarRut(item.rut) === limpiarRut(campos.rut),
+          );
           setIdExistente(existente?.id ?? null);
-        } catch { /* El error sigue visible. */ }
+        } catch {
+          /* El aviso de duplicado sigue siendo visible. */
+        }
       }
     } finally {
       setGuardando(false);
@@ -138,37 +201,92 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
         <div>
           <p className="section-context">Registro académico</p>
           <h1>Nuevo expediente</h1>
-          <p>Complete los datos del estudiante y su examen.</p>
+          <p>
+            Complete los datos del examen y la comisión en un solo formulario.
+          </p>
         </div>
       </div>
-      <form className="editor-panel" onSubmit={guardar} noValidate>
-        <div className="editor-intro"><div><h2>Datos del estudiante</h2><p>Los campos marcados con * son obligatorios.</p></div></div>
+      <form
+        className="editor-panel registro-panel"
+        onSubmit={guardar}
+        noValidate
+      >
+        <div className="editor-intro">
+          <div>
+            <h2>Datos del estudiante</h2>
+            <p>Los campos marcados con * son obligatorios.</p>
+          </div>
+        </div>
         <div className="form-grid">
-          {campoTexto("nombre", "Nombre completo *")}
-          {campoTexto("rut", "RUT *")}
-          {campoTexto("anio", "Año de egreso *", "number")}
+          {campoTexto("nombre", "Nombre completo *", {
+            placeholder: "Nombre y apellidos",
+          })}
+          {campoTexto("rut", "RUT *", { placeholder: "12.345.678-5" })}
+          {campoTexto("anio", "Año de egreso *", {
+            type: "number",
+            inputMode: "numeric",
+          })}
           <label htmlFor="registro-semestre">
             Semestre de egreso *
-            <select id="registro-semestre" value={campos.semestre} onChange={(e) => cambiar("semestre", e.target.value)}>
+            <select
+              id="registro-semestre"
+              value={campos.semestre}
+              onChange={(e) => cambiar("semestre", e.target.value)}
+            >
               <option value="1">Primer semestre</option>
               <option value="2">Segundo semestre</option>
             </select>
           </label>
-          {campoTexto("fechaExamen", "Fecha del examen de título *", "date")}
-          {campoTexto("nota", "Nota del examen *")}
+          {campoTexto("fechaExamen", "Fecha del examen de título *", {
+            type: "date",
+          })}
+          {campoTexto("nota", "Nota del examen *", {
+            placeholder: "Ejemplo: 6,2",
+            inputMode: "decimal",
+          })}
         </div>
-        <div className="editor-intro"><div><h2>Comisión evaluadora</h2><p>Registre a quienes evaluaron el examen.</p></div></div>
+        <div className="editor-intro">
+          <div>
+            <h2>Comisión evaluadora</h2>
+            <p>Registre personas diferentes en cada función.</p>
+          </div>
+        </div>
         <div className="form-grid">
           {campoTexto("guia", "Profesor guía *")}
           {campoTexto("informante1", "Primer informante *")}
           {campoTexto("informante2", "Segundo informante *")}
           {campoTexto("informanteAdicional", "Informante adicional (opcional)")}
         </div>
-        {errorGeneral && <div className="form-error" role="alert">{errorGeneral}{idExistente && <button className="inline-action" type="button" onClick={() => alGuardar(idExistente)}>Abrir expediente existente</button>}</div>}
+        {errorGeneral && (
+          <div className="form-error" role="alert">
+            {errorGeneral}
+            {idExistente && (
+              <button
+                className="inline-action"
+                type="button"
+                onClick={() => alGuardar(idExistente)}
+              >
+                Abrir expediente existente
+              </button>
+            )}
+          </div>
+        )}
         <div className="editor-actions">
-          <button className="button button-secondary" type="button" onClick={alCancelar} disabled={guardando}>Cancelar</button>
-          <button className="button button-primary" type="submit" disabled={guardando}>
-            {guardando ? "Guardando…" : "Guardar expediente"} <Icon name="arrow" size={18} />
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={alCancelar}
+            disabled={guardando}
+          >
+            Cancelar
+          </button>
+          <button
+            className="button button-primary"
+            type="submit"
+            disabled={guardando}
+          >
+            {guardando ? "Guardando…" : "Guardar expediente"}{" "}
+            <Icon name="arrow" size={18} />
           </button>
         </div>
       </form>
