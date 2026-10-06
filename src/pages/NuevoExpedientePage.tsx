@@ -17,7 +17,7 @@ interface Campos {
   anio: string;
   semestre: string;
   fechaExamen: string;
-
+  nota: string;
 }
 
 type Campo = keyof Campos;
@@ -29,7 +29,7 @@ const inicial: Campos = {
   anio: String(new Date().getFullYear()),
   semestre: "1",
   fechaExamen: "",
-
+  nota: "",
 };
 
 /** Devuelve un mensaje por cada dato que se debe corregir. */
@@ -41,7 +41,9 @@ function validar(campos: Campos): Errores {
   if (!Number.isInteger(anio) || anio < 2000 || anio > 2100)
     errores.anio = "Ingrese un año entre 2000 y 2100.";
   if (!campos.fechaExamen) errores.fechaExamen = "Seleccione la fecha del examen.";
-
+  const nota = Number(campos.nota.replace(",", "."));
+  if (!campos.nota.trim()) errores.nota = "Ingrese la nota del examen.";
+  else if (!Number.isFinite(nota) || nota < 1 || nota > 7) errores.nota = "La nota debe estar entre 1,0 y 7,0.";
   return errores;
 }
 
@@ -96,7 +98,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
       semestreEgreso: Number(campos.semestre) as 1 | 2,
       fechaExamen: campos.fechaExamen,
       colegiatura: "sin-informar",
-
+      notaExamen: Number(campos.nota.replace(",", ".")),
     };
     setGuardando(true);
     try {
@@ -134,7 +136,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
             </select>
           </label>
           {campoTexto("fechaExamen", "Fecha del examen de título *", "date")}
-
+          {campoTexto("nota", "Nota del examen *")}
         </div>
 
         {errorGeneral && <div className="form-error" role="alert">{errorGeneral}</div>}
