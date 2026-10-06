@@ -18,6 +18,10 @@ interface Campos {
   semestre: string;
   fechaExamen: string;
   nota: string;
+  guia: string;
+  informante1: string;
+  informante2: string;
+  informanteAdicional: string;
 }
 
 type Campo = keyof Campos;
@@ -30,6 +34,10 @@ const inicial: Campos = {
   semestre: "1",
   fechaExamen: "",
   nota: "",
+  guia: "",
+  informante1: "",
+  informante2: "",
+  informanteAdicional: "",
 };
 
 /** Devuelve un mensaje por cada dato que se debe corregir. */
@@ -44,6 +52,9 @@ function validar(campos: Campos): Errores {
   const nota = Number(campos.nota.replace(",", "."));
   if (!campos.nota.trim()) errores.nota = "Ingrese la nota del examen.";
   else if (!Number.isFinite(nota) || nota < 1 || nota > 7) errores.nota = "La nota debe estar entre 1,0 y 7,0.";
+  if (!campos.guia.trim()) errores.guia = "Ingrese el profesor guía.";
+  if (!campos.informante1.trim()) errores.informante1 = "Ingrese el primer informante.";
+  if (!campos.informante2.trim()) errores.informante2 = "Ingrese el segundo informante.";
   return errores;
 }
 
@@ -99,6 +110,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
       fechaExamen: campos.fechaExamen,
       colegiatura: "sin-informar",
       notaExamen: Number(campos.nota.replace(",", ".")),
+      comision: { guia: campos.guia.trim(), informante1: campos.informante1.trim(), informante2: campos.informante2.trim(), ...(campos.informanteAdicional.trim() ? { informanteAdicional: campos.informanteAdicional.trim() } : {}) },
     };
     setGuardando(true);
     try {
@@ -138,7 +150,13 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
           {campoTexto("fechaExamen", "Fecha del examen de título *", "date")}
           {campoTexto("nota", "Nota del examen *")}
         </div>
-
+        <div className="editor-intro"><div><h2>Comisión evaluadora</h2><p>Registre a quienes evaluaron el examen.</p></div></div>
+        <div className="form-grid">
+          {campoTexto("guia", "Profesor guía *")}
+          {campoTexto("informante1", "Primer informante *")}
+          {campoTexto("informante2", "Segundo informante *")}
+          {campoTexto("informanteAdicional", "Informante adicional (opcional)")}
+        </div>
         {errorGeneral && <div className="form-error" role="alert">{errorGeneral}</div>}
         <div className="editor-actions">
           <button className="button button-secondary" type="button" onClick={alCancelar}>Cancelar</button>
