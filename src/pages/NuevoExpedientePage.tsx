@@ -55,6 +55,8 @@ function validar(campos: Campos): Errores {
   if (!campos.guia.trim()) errores.guia = "Ingrese el profesor guía.";
   if (!campos.informante1.trim()) errores.informante1 = "Ingrese el primer informante.";
   if (!campos.informante2.trim()) errores.informante2 = "Ingrese el segundo informante.";
+  const docentes = [campos.guia, campos.informante1, campos.informante2, campos.informanteAdicional].map((valor) => valor.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()).filter(Boolean);
+  if (new Set(docentes).size !== docentes.length) errores.guia = "Un docente figura dos veces en la comisión.";
   return errores;
 }
 
