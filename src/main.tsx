@@ -5,7 +5,8 @@ import { AuthProvider } from "./context/AuthContext";
 import "@fontsource-variable/ibm-plex-sans";
 import "./styles.css";
 
-// AuthProvider envuelve toda la app: cualquier pantalla puede llamar useAuth().
+// Este es el punto de entrada. AuthProvider deja la sesión disponible para App
+// y sus páginas; sin él, useAuth() no puede leer el contexto compartido.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>

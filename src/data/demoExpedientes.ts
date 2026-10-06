@@ -1,6 +1,7 @@
 import type { Expediente } from "../types/expediente";
 
-// Todos estos registros son inventados. Nunca se usan como datos reales de alumnos.
+// Todos estos registros son inventados. leerDemo() los usa solo cuando no hay
+// una lista guardada en localStorage y Firebase no está configurado.
 export const demoExpedientes: Expediente[] = [
   {
     id: "demo-001",

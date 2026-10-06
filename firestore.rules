@@ -3,11 +3,14 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Solo una cuenta autenticada con rol direccion puede leer o modificar fichas.
     function esDireccion() {
+      // El uid de Authentication debe tener un documento usuarios/<uid>
+      // creado por un administrador con rol "direccion".
       return request.auth != null
         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'direccion';
     }
 
     match /expedientes/{id} {
+      // Incluye crear, consultar, editar y eliminar documentos de expedientes.
       allow read, write: if esDireccion();
     }
 

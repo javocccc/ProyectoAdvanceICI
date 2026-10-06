@@ -1,4 +1,3 @@
-
 import {
   deleteObject,
   getBlob,
@@ -12,7 +11,9 @@ import { storage } from "./firebase";
 const MAX_MB = 10;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
-/** Comprueba extensión, tipo, tamaño y firma antes de enviar el archivo. */
+// La ficha llama a estas funciones; el servicio no decide cuándo mostrar
+// confirmaciones ni guarda por sí solo la ruta del acta en Firestore.
+/** Comprueba extensión, tipo, tamaño y cabecera PDF antes de enviarlo. Storage repite las comprobaciones de tipo y tamaño. */
 export async function validarActa(archivo: File): Promise<string | null> {
   if (!/\.pdf$/i.test(archivo.name) || archivo.type !== "application/pdf")
     return "Seleccione un archivo PDF.";
@@ -24,7 +25,7 @@ export async function validarActa(archivo: File): Promise<string | null> {
   return null;
 }
 
-/** Sube una copia con nombre único y comunica el avance a la interfaz. */
+/** Sube una copia con nombre único y comunica el avance. La ficha guarda después esta referencia en el expediente. */
 export async function subirActa(
   expedienteId: string,
   archivo: File,
@@ -43,6 +44,8 @@ export async function subirActa(
   const tarea = uploadBytesResumable(ref(storage, ruta), archivo, {
     contentType: "application/pdf",
   });
+  // Firebase informa bytes enviados. Convertimos ese dato a un porcentaje
+  // para la barra de progreso que muestra ExpedienteDetallePage.
   await new Promise<void>((resolve, reject) => {
     tarea.on(
       "state_changed",
@@ -58,21 +61,21 @@ export async function subirActa(
   return { nombre: archivo.name, ruta, fechaCarga: new Date().toISOString() };
 }
 
-/** Solicita una dirección temporal para abrir el PDF en otra pestaña. */
+/** Obtiene una URL de descarga de Storage para abrir el PDF en otra pestaña. */
 export async function urlActa(acta: Acta): Promise<string> {
   if (!storage)
     throw new Error("El acta de demostración no está respaldada en Firebase.");
   return getDownloadURL(ref(storage, acta.ruta));
 }
 
-/** Descarga el contenido para que el navegador use el nombre original. */
+/** Obtiene los bytes del PDF; la ficha crea un enlace con el nombre original. */
 export async function blobActa(acta: Acta): Promise<Blob> {
   if (!storage)
     throw new Error("El acta de demostración no está respaldada en Firebase.");
   return getBlob(ref(storage, acta.ruta));
 }
 
-/** Borra copias antiguas después de reemplazar el acta o cancelar una carga. */
+/** Borra una copia de Storage al reemplazarla o al fallar el guardado de su ruta. */
 export async function borrarActa(acta: Acta): Promise<void> {
   if (storage && acta.ruta.startsWith("actas/"))
     await deleteObject(ref(storage, acta.ruta));

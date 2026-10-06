@@ -27,13 +27,21 @@ interface ValorAuthContext {
 
 const CLAVE_SESION_DEMO = "advance-ici-sesion-demo";
 
-// El contexto funciona como una "caja compartida" para login, panel y menú.
+// 1. createContext define qué datos se pueden compartir.
+// 2. AuthProvider coloca esos datos alrededor de App en main.tsx.
+// 3. useAuth usa useContext para que cada pantalla los lea sin pasar props
+//    por todos los componentes intermedios.
 const AuthContext = createContext<ValorAuthContext | null>(null);
 
+/** Mantiene una única sesión para toda la aplicación y publica sus cambios. */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // usuario=null significa que no hay sesión; cargando evita mostrar el login
+  // antes de que Firebase termine de comprobar si ya había una sesión abierta.
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [cargando, setCargando] = useState(true);
 
+  // Se ejecuta al montar el proveedor. Devuelve la función de desuscripción
+  // de Firebase para dejar de escuchar cambios cuando el proveedor se cierre.
   useEffect(() => {
     if (!auth) {
       // En demostración, la sesión dura hasta cerrar la pestaña del navegador.
@@ -50,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Firebase avisa cada vez que cambia la sesión, incluso después de recargar.
+    // El permiso para leer fichas lo comprueban las reglas, no este contexto.
     return onAuthStateChanged(auth, (cuenta) => {
       setUsuario(
         cuenta
@@ -67,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /** El login llama a esta función; Firebase o demo actualizan usuario. */
   async function ingresar(email: string, clave: string, recordar: boolean) {
     if (auth) {
       // Firebase maneja la contraseña. "Recordar" decide si la sesión sobrevive al cierre.
@@ -89,12 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(demo);
   }
 
+  /** Cierra la sesión y hace que App vuelva a mostrar LoginPage. */
   async function salir() {
     if (auth) await signOut(auth);
     sessionStorage.removeItem(CLAVE_SESION_DEMO);
     setUsuario(null);
   }
 
+  // Cuando cambia usuario, React vuelve a renderizar los consumidores de
+  // useAuth(), como App y el formulario de ingreso.
   return (
     <AuthContext.Provider value={{ usuario, cargando, ingresar, salir }}>
       {children}
@@ -102,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Hook: cada componente obtiene el usuario sin pasar props por muchas capas. */
+/** Lee el contexto compartido; el error ayuda a detectar páginas fuera de AuthProvider. */
 export function useAuth(): ValorAuthContext {
   const contexto = useContext(AuthContext);
   if (!contexto) throw new Error("useAuth debe usarse dentro de AuthProvider.");

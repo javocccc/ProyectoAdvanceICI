@@ -4,14 +4,18 @@ import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
 import { firebaseConfigurado } from "../services/firebase";
 
+/** Muestra el formulario de acceso; la verificación real vive en AuthContext. */
 export function LoginPage() {
+  // useAuth obtiene ingresar() del proveedor que envuelve la aplicación.
   const { ingresar } = useAuth();
+  // Cada cambio en los campos actualiza el estado y React vuelve a dibujarlos.
   const [email, setEmail] = useState("");
   const [clave, setClave] = useState("");
   const [recordar, setRecordar] = useState(false);
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  /** Evita el envío normal del navegador y espera el resultado del ingreso. */
   async function manejarIngreso(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError("");
@@ -19,6 +23,7 @@ export function LoginPage() {
     try {
       await ingresar(email.trim(), clave, recordar);
     } catch (problema) {
+      // Los errores internos de Firebase se resumen en un mensaje comprensible.
       const codigo = (problema as { code?: string }).code;
       setError(
         codigo?.startsWith("auth/")

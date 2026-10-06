@@ -57,6 +57,7 @@ input,
 select {
   caret-color: var(--blue);
 }
+/* Mantiene un texto disponible para lectores de pantalla sin mostrarlo. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -352,7 +353,7 @@ select {
   min-height: 260px;
 }
 
-/* ESTRUCTURA PRINCIPAL */
+/* ESTRUCTURA PRINCIPAL: App usa estas clases para menú, cabecera y contenido. */
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -748,6 +749,7 @@ select {
 .recent-section .section-heading {
   padding: 0 27px;
 }
+/* La tabla se desplaza dentro de su panel en pantallas estrechas. */
 .table-scroll {
   overflow-x: auto;
 }
@@ -939,7 +941,7 @@ select {
   margin-top: 19px;
 }
 
-/* BÚSQUEDA, FORMULARIO Y FICHA */
+/* BÚSQUEDA, FORMULARIO Y FICHA: clases usadas por las páginas de src/pages. */
 .listing-panel {
   overflow: hidden;
 }
@@ -1112,6 +1114,7 @@ select {
   font-size: 13px;
 }
 
+/* Los siguientes cortes reorganizan la interfaz a medida que baja el ancho. */
 @media (max-width: 1180px) {
   .content-columns {
     grid-template-columns: 1fr;
@@ -1385,6 +1388,7 @@ select {
     font-size: 25px;
   }
 }
+/* Respeta la preferencia del sistema de reducir animaciones. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *:before,

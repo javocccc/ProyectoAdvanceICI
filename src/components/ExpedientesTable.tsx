@@ -4,12 +4,14 @@ import { EstadoBadge } from "./EstadoBadge";
 import { Icon } from "./Icon";
 
 interface TablaProps {
+  // PanelPage y ExpedientesPage entregan listas distintas a la misma tabla.
   expedientes: Expediente[];
   alAbrir: (id: string) => void;
 }
 
 /** Tabla compartida por el panel y la pantalla de búsqueda. */
 export function ExpedientesTable({ expedientes, alAbrir }: TablaProps) {
+  // La misma tabla muestra un estado vacío si la búsqueda no encontró filas.
   if (expedientes.length === 0)
     return (
       <div className="empty-state">
@@ -32,6 +34,7 @@ export function ExpedientesTable({ expedientes, alAbrir }: TablaProps) {
           </tr>
         </thead>
         <tbody>
+          {/* map crea una fila por expediente; key permite a React identificarla. */}
           {expedientes.map((item) => (
             <tr key={item.id}>
               <td>

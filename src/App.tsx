@@ -10,10 +10,14 @@ import { LoginPage } from "./pages/LoginPage";
 import { NuevoExpedientePage } from "./pages/NuevoExpedientePage";
 import { PanelPage } from "./pages/PanelPage";
 
+// La navegación es local a esta pestaña: cambiar de vista no cambia la URL.
 type Vista = "panel" | "expedientes" | "nuevo" | "detalle";
 
 export default function App() {
+  // useAuth lee el valor que AuthProvider publicó desde main.tsx.
   const { usuario, cargando, salir } = useAuth();
+  // App conserva la navegación y la lista; pasa datos y acciones a cada página
+  // mediante props (por ejemplo, alAbrir recibe el id del expediente elegido).
   const [vista, setVista] = useState<Vista>("panel");
   const [expedientes, setExpedientes] = useState<Expediente[]>([]);
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
@@ -22,7 +26,8 @@ export default function App() {
   const [errorDatos, setErrorDatos] = useState("");
   const [menuAbierto, setMenuAbierto] = useState(false);
 
-  // useEffect consulta Firebase o localStorage al iniciar sesión y al cambiar de pantalla.
+  // Al volver de crear o editar una ficha, cambiar de vista vuelve a leer los
+  // datos del servicio. "vigente" evita actualizar una pantalla ya desmontada.
   useEffect(() => {
     if (!usuario) return;
     let vigente = true;
@@ -48,20 +53,24 @@ export default function App() {
     };
   }, [usuario, vista]);
 
+  /** Cambia la pantalla visible y cierra el menú móvil. */
   function navegar(destino: Vista) {
     setVista(destino);
     setMenuAbierto(false);
   }
+  /** La tabla entrega un id; la ficha busca ese expediente en la lista. */
   function abrir(id: string) {
     setSeleccionado(id);
     navegar("detalle");
   }
+  /** Envía la búsqueda del panel a la pantalla de expedientes. */
   function buscar(texto: string) {
     setBusqueda(texto);
     navegar("expedientes");
   }
   const expedienteActual = expedientes.find((item) => item.id === seleccionado);
 
+  // Primero se resuelve la sesión; después se decide entre login y aplicación.
   if (cargando)
     return <div className="startup-loading">Cargando Advance ICI…</div>;
   if (!usuario) return <LoginPage />;

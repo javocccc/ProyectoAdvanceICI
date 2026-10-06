@@ -1,11 +1,9 @@
-// Ejemplos: 12.345.678-5 es válido; 12.345.678-9 es inválido.
-
-/** Quita puntos, espacios y guion para comparar dos RUT escritos distinto. */
+/** Quita la puntuación habitual y unifica la K para comparar RUT equivalentes. */
 export function limpiarRut(valor: string): string {
   return valor.replace(/[.\s-]/g, "").toUpperCase();
 }
 
-/** Calcula el dígito verificador chileno con módulo 11. */
+/** Recorre el cuerpo de derecha a izquierda con factores de 2 a 7 (módulo 11). */
 export function digitoVerificador(cuerpo: string): string {
   let suma = 0;
   let factor = 2;
@@ -17,7 +15,7 @@ export function digitoVerificador(cuerpo: string): string {
   return resto === 11 ? "0" : resto === 10 ? "K" : String(resto);
 }
 
-/** Acepta RUT con o sin puntos y comprueba su dígito verificador. */
+/** Acepta RUT con o sin puntos o guion, si el dígito verificador coincide. */
 export function validarRut(valor: string): boolean {
   const limpio = limpiarRut(valor);
   if (!/^\d{7,8}[\dK]$/.test(limpio)) return false;

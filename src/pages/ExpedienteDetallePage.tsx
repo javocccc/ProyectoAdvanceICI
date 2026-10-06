@@ -19,11 +19,12 @@ import { formatearFecha } from "../utils/formato";
 import "./ExpedienteDetallePage.css";
 
 interface DetalleProps {
+  // App entrega la ficha elegida y la acción para volver al listado.
   expediente: Expediente;
   alVolver: () => void;
 }
 
-/** Descarga un Blob con el nombre que tenía el PDF al subirlo. */
+/** Crea un enlace temporal del navegador para descargar un PDF con su nombre original. */
 function descargarBlob(blob: Blob, nombre: string) {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
@@ -33,6 +34,7 @@ function descargarBlob(blob: Blob, nombre: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** Traduce el valor guardado a la etiqueta que verá la persona. */
 function nombreEstadoColegiatura(estado: EstadoColegiatura): string {
   switch (estado) {
     case "al-dia":
@@ -46,6 +48,8 @@ function nombreEstadoColegiatura(estado: EstadoColegiatura): string {
 
 export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   const { usuario } = useAuth();
+  // "actual" refleja inmediatamente lo guardado; App volverá a consultar al
+  // cambiar de pantalla. Los demás estados manejan los dos formularios.
   const [actual, setActual] = useState(expediente);
   const [estado, setEstado] = useState<EstadoColegiatura>(
     expediente.colegiatura,
@@ -59,11 +63,15 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   const [progreso, setProgreso] = useState(0);
   const [errorActa, setErrorActa] = useState("");
   const [mensajeActa, setMensajeActa] = useState("");
-  // URL temporal del PDF en demostración: desaparece al cerrar la ficha.
+  // useRef conserva valores entre renders sin causar otro render. La URL
+  // temporal del PDF demo desaparece al cerrar o cambiar de ficha.
   const demoUrl = useRef<string | null>(null);
+  // Las operaciones de red pueden terminar después de abrir otra ficha.
+  // Comparamos este id antes de escribir mensajes en la pantalla visible.
   const expedienteVisibleId = useRef(expediente.id);
   expedienteVisibleId.current = expediente.id;
 
+  // Si App entrega otra ficha, reiniciamos campos y avisos de la anterior.
   useEffect(() => {
     setActual(expediente);
     setEstado(expediente.colegiatura);
@@ -90,8 +98,8 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     const expedienteId = actual.id;
 
     setGuardandoEstado(true);
-    setGuardandoEstado(true);
     setErrorEstado("");
+    // Se añade un evento sin borrar los anteriores. La observación es opcional.
     const fecha = new Date().toISOString();
     const observacionLimpia = observacion.trim();
     const historial = [
@@ -144,6 +152,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     setMensajeActa("");
   }
 
+  /** El arrastre usa la misma selección que el botón de elegir archivo. */
   function soltarArchivo(evento: DragEvent<HTMLLabelElement>) {
     evento.preventDefault();
     elegirArchivo(evento.dataTransfer.files[0] ?? null);
@@ -161,6 +170,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
       setErrorActa(error);
       return;
     }
+    // El primer clic al reemplazar solo muestra la pregunta de confirmación.
     if (actual.acta && !confirmarReemplazo) {
       setConfirmarReemplazo(true);
       return;
@@ -169,6 +179,8 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
     setProgreso(0);
     let subida: Awaited<ReturnType<typeof subirActa>> | null = null;
     try {
+      // Primero subimos el PDF y luego guardamos su ruta en la ficha.
+      // Si falla Firestore, el bloque catch intenta borrar la subida huérfana.
       subida = await subirActa(expedienteId, archivoElegido, (porcentaje) => {
         if (expedienteVisibleId.current === expedienteId) {
           setProgreso(porcentaje);
@@ -184,6 +196,7 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             : previo,
         );
         if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
+        // En demo el PDF vive solo en memoria; el servicio guarda su nombre.
         demoUrl.current = actaGuardada.ruta.startsWith("demo/")
           ? URL.createObjectURL(archivoElegido)
           : null;
@@ -197,7 +210,8 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
             : "Acta guardada en Firebase Storage.",
         );
       }
-      // Un fallo al borrar la anterior no invalida el acta nueva ya registrada.
+      // La copia anterior solo se borra cuando la nueva ya quedó registrada.
+      // Un fallo al borrarla no invalida la nueva acta.
       if (anterior) {
         try {
           await borrarActa(anterior);
@@ -236,6 +250,8 @@ export function ExpedienteDetallePage({ expediente, alVolver }: DetalleProps) {
   async function abrirArchivo() {
     if (!actual.acta) return;
     setErrorActa("");
+    // Abrimos la pestaña antes de esperar Firebase para que el navegador no
+    // interprete la apertura tardía como una ventana emergente inesperada.
     const ventana = window.open("", "_blank");
     if (ventana) ventana.opener = null;
     try {

@@ -6,6 +6,7 @@ import type { Expediente, EstadoColegiatura } from "../types/expediente";
 type Filtro = "todos" | EstadoColegiatura;
 
 interface ExpedientesProps {
+  // App aporta los registros y recibe el id cuando alguien abre una ficha.
   expedientes: Expediente[];
   busquedaInicial: string;
   alAbrir: (id: string) => void;
@@ -27,8 +28,11 @@ export function ExpedientesPage({
   alAbrir,
   alNuevo,
 }: ExpedientesProps) {
+  // La búsqueda del panel llega como valor inicial; aquí puede seguir editándose.
   const [busqueda, setBusqueda] = useState(busquedaInicial);
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  // useMemo recalcula la lista visible cuando cambia la lista, el texto o el
+  // filtro. No modifica los expedientes originales recibidos por props.
   const visibles = useMemo(
     () =>
       expedientes.filter((item) => {

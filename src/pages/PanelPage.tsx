@@ -5,6 +5,7 @@ import { ExpedientesTable } from "../components/ExpedientesTable";
 import type { Expediente } from "../types/expediente";
 
 interface PanelProps {
+  // App entrega la lista y las acciones; el panel solo presenta un resumen.
   expedientes: Expediente[];
   alBuscar: (texto: string) => void;
   alAbrir: (id: string) => void;
@@ -20,15 +21,19 @@ export function PanelPage({
   alVerTodos,
 }: PanelProps) {
   const [texto, setTexto] = useState("");
+  // Estas cifras se calculan de la lista recibida, no se guardan por separado.
+  // "Sin informar" también cuenta como pendiente de revisión.
   const pendientesPago = expedientes.filter(
     (item) =>
       item.colegiatura === "no-al-dia" || item.colegiatura === "sin-informar",
   );
   const sinActa = expedientes.filter((item) => !item.acta);
+  // La copia evita alterar el orden de la lista que App comparte con otras páginas.
   const recientes = [...expedientes]
     .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))
     .slice(0, 5);
 
+  /** Entrega el texto a App, que abre la lista con esa búsqueda inicial. */
   function buscar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     alBuscar(texto);

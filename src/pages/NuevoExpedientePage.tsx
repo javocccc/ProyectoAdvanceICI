@@ -12,8 +12,9 @@ interface NuevoProps {
   alCancelar: () => void;
 }
 
-// Una interfaz reúne todos los valores del formulario en vez de tener un estado por campo.
 interface Campos {
+  // Se guardan como texto mientras la persona escribe; guardar() los convierte
+  // a los números y al formato de RUT que espera el modelo Expediente.
   nombre: string;
   rut: string;
   anio: string;
@@ -42,7 +43,7 @@ const inicial: Campos = {
   informanteAdicional: "",
 };
 
-/** Cada error apunta a un campo para que la persona pueda corregirlo. */
+/** Reúne los errores por campo antes de intentar guardar. */
 function validar(campos: Campos): Errores {
   const errores: Errores = {};
   if (!campos.nombre.trim()) errores.nombre = "Ingrese el nombre completo.";
@@ -64,7 +65,7 @@ function validar(campos: Campos): Errores {
   if (!campos.informante2.trim())
     errores.informante2 = "Ingrese el segundo informante.";
 
-  // La comparación ignora espacios, tildes y mayúsculas.
+  // La comparación ignora espacios, tildes y mayúsculas para detectar el mismo docente.
   const docentes = (
     ["guia", "informante1", "informante2", "informanteAdicional"] as const
   )
@@ -90,24 +91,26 @@ function validar(campos: Campos): Errores {
   return errores;
 }
 
-/** Formulario completo: React guarda los campos y vuelve a dibujar al escribir. */
+/** Formulario completo de registro. Conserva los datos si falla la validación o el guardado. */
 export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
   const { usuario } = useAuth();
+  // Los inputs son controlados: muestran "campos" y cambiar() actualiza ese estado.
+  // Se conservan los valores si la validación o la escritura en Firebase falla.
   const [campos, setCampos] = useState<Campos>(inicial);
   const [errores, setErrores] = useState<Errores>({});
   const [errorGeneral, setErrorGeneral] = useState("");
   const [idExistente, setIdExistente] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  /** Actualiza un campo y borra su error sin perder el resto del formulario. */
   function cambiar(campo: Campo, valor: string) {
+    // Solo se limpia el error del campo corregido. Si había un RUT duplicado,
+    // se oculta el enlace anterior hasta comprobar de nuevo el formulario.
     setCampos((actual) => ({ ...actual, [campo]: valor }));
     setErrores((actual) => ({ ...actual, [campo]: undefined }));
     setErrorGeneral("");
     setIdExistente(null);
   }
 
-  /** Crea un input unido a su etiqueta y a un mensaje de error accesible. */
   function campoTexto(
     campo: Campo,
     titulo: string,
@@ -117,6 +120,8 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
       inputMode?: "decimal" | "numeric";
     } = {},
   ) {
+    // Un mismo componente de campo mantiene consistentes etiqueta, valor y
+    // mensaje de error para los datos académicos y de la comisión.
     return (
       <label key={campo} htmlFor={`registro-${campo}`}>
         {titulo}
@@ -140,7 +145,6 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     );
   }
 
-  /** Valida, guarda mediante el servicio y abre la ficha recién creada. */
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (!usuario || guardando) return;
@@ -149,12 +153,13 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     setErrorGeneral("");
     setIdExistente(null);
     if (Object.keys(encontrados).length) {
+      // Lleva el teclado al primer dato pendiente de corrección.
       const primero = Object.keys(encontrados)[0];
       document.getElementById(`registro-${primero}`)?.focus();
       return;
     }
 
-    // Los campos opcionales se omiten cuando están vacíos para que Firestore los acepte.
+    // El campo adicional se omite por completo cuando queda vacío.
     const comision = {
       guia: campos.guia.trim(),
       informante1: campos.informante1.trim(),
@@ -175,6 +180,8 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
     };
     setGuardando(true);
     try {
+      // crearExpediente agrega id, fecha, autor e historial. App abre la ficha
+      // al recibir el id por alGuardar.
       const expediente = await crearExpediente(nuevo, usuario.email);
       alGuardar(expediente.id);
     } catch (problema) {
@@ -185,6 +192,7 @@ export function NuevoExpedientePage({ alGuardar, alCancelar }: NuevoProps) {
       setErrorGeneral(mensaje);
       if (mensaje.includes("Ya existe")) {
         try {
+          // Ofrece abrir la ficha existente sin perder el aviso de duplicado.
           const existente = (await listarExpedientes()).find(
             (item) => limpiarRut(item.rut) === limpiarRut(campos.rut),
           );

@@ -9,11 +9,11 @@ export interface Comision {
   informanteAdicional?: string;
 }
 
-/** Información de un acta PDF. La ruta apunta a Firebase Storage en modo real. */
+/** Datos descriptivos de un PDF. "ruta" apunta a Storage o a un marcador demo/; no contiene el archivo. */
 export interface Acta {
-  nombre: string;
-  ruta: string;
-  fechaCarga: string;
+  nombre: string; // Nombre original que verá la persona al descargar.
+  ruta: string; // Ubicación del PDF en Storage; en demo comienza con "demo/".
+  fechaCarga: string; // Fecha y hora ISO de la carga.
 }
 
 /** Un evento permite mostrar quién cambió la colegiatura y cuándo. */
@@ -25,25 +25,25 @@ export interface CambioColegiatura {
   observacion?: string;
 }
 
-/** Contrato común para formulario, panel, ficha y Firebase. */
+/** Datos compartidos por las pantallas y el servicio. Las fechas son texto ISO; la nota y la comisión son opcionales. */
 export interface Expediente {
-  id: string;
+  id: string; // También es el identificador del documento en Firestore.
   nombre: string;
   rut: string;
   anioEgreso: number;
   semestreEgreso: 1 | 2;
-  fechaExamen: string;
-  notaExamen?: number;
-  comision?: Comision;
+  fechaExamen: string; // Fecha del formulario: AAAA-MM-DD.
+  notaExamen?: number; // Puede faltar en fichas creadas con el formulario anterior.
+  comision?: Comision; // Puede faltar en fichas creadas con el formulario anterior.
   colegiatura: EstadoColegiatura;
-  fechaColegiatura?: string;
+  fechaColegiatura?: string; // Fecha y hora ISO del último cambio.
   historialColegiatura: CambioColegiatura[];
   acta?: Acta;
-  fechaCreacion: string;
-  creadoPor: string;
+  fechaCreacion: string; // Fecha y hora ISO que agrega el servicio al crear.
+  creadoPor: string; // Correo de la persona que creó la ficha.
 }
 
-/** Se usa al crear una ficha; el id y las fechas se añaden al guardar. */
+/** Omit quita los campos que crea el servicio, para que el formulario no deba pedirlos. */
 export type NuevoExpediente = Omit<
   Expediente,
   "id" | "fechaCreacion" | "creadoPor" | "historialColegiatura"

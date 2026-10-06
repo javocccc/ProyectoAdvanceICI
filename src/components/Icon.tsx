@@ -1,4 +1,5 @@
 interface IconProps {
+  // TypeScript limita los nombres a los iconos dibujados en "paths".
   name:
     | "grid"
     | "folder"
@@ -19,6 +20,8 @@ interface IconProps {
 
 /** Todos los iconos comparten grosor y tamaño; no dependemos de caracteres emoji. */
 export function Icon({ name, size = 20 }: IconProps) {
+  // Cada nombre apunta a trazos SVG. El return final aplica el mismo tamaño,
+  // color heredado y grosor a todos los iconos de la aplicación.
   const paths: Record<IconProps["name"], React.ReactNode> = {
     grid: (
       <>

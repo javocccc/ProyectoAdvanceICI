@@ -1,3 +1,5 @@
+/* Estilos propios de la ficha: formulario de colegiatura, historial y acta.
+   Los colores se toman de las variables generales definidas en styles.css. */
 .ficha-grid .ficha-form {
   display: grid;
   gap: 14px;
@@ -31,6 +33,7 @@
   color: var(--navy);
   font-size: 14px;
 }
+/* Cada cambio aparece como un elemento de la lista cronológica. */
 .ficha-grid .historial-lista {
   list-style: none;
   padding: 0;
@@ -70,6 +73,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* Zona donde se elige o arrastra el PDF antes de subirlo. */
 .ficha-grid .acta-dropzone {
   display: grid;
   justify-items: center;
@@ -137,6 +141,7 @@
 .ficha-grid .acta-message {
   color: var(--green);
 }
+/* En móvil, los botones ocupan todo el ancho para facilitar el toque. */
 @media (max-width: 700px) {
   .ficha-grid .ficha-form .button,
   .ficha-grid .acta-submit {
