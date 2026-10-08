@@ -1,0 +1,32 @@
+.registro-panel .form-grid {
+  padding-bottom: 30px;
+}
+.registro-panel .editor-intro:not(:first-child) {
+  padding-top: 24px;
+}
+.registro-panel .field-error {
+  color: #9c3125;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.registro-panel [aria-invalid="true"] {
+  border-color: #bd4c3b;
+  background: #fffafa;
+}
+.registro-panel .inline-action {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #123fce;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .registro-panel .form-grid {
+    gap: 18px;
+  }
+}

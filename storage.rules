@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function esDireccion() {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.rol == 'direccion';
+    }
+
+    match /actas/{expedienteId}/{nombreArchivo} {
+      // Solo se aceptan PDF menores a 10 MB, además del control de la interfaz.
+      allow read: if esDireccion();
+      allow create, update: if esDireccion()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if esDireccion();
+    }
+  }
+}
