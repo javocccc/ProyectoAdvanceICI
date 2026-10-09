@@ -68,14 +68,11 @@ export default function App() {
     setVolverTrasEditar(regresarA);
     navegar("editar");
   }
-<<<<<<< HEAD
   /** Guarda la selección y vuelve al contexto desde el que se inició la edición. */
   function despuesDeEditar(id: string) {
     setSeleccionado(id);
     navegar(volverTrasEditar);
   }
-=======
->>>>>>> 3fa9f830017d47936d7b6ca1c8d60e62a1506d4e
   /** Envía la búsqueda del panel a la pantalla de expedientes. */
   function buscar(texto: string) {
     setBusqueda(texto);
@@ -229,11 +226,7 @@ export default function App() {
                   key={expedienteActual.id}
                   expediente={expedienteActual}
                   alCancelar={() => navegar(volverTrasEditar)}
-<<<<<<< HEAD
                   alGuardar={despuesDeEditar}
-=======
-                  alGuardar={abrir}
->>>>>>> 3fa9f830017d47936d7b6ca1c8d60e62a1506d4e
                 />
               )}
               {vista === "detalle" && expedienteActual && (

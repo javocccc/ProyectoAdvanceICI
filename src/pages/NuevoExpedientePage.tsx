@@ -39,10 +39,12 @@ interface Campos {
 type Campo = keyof Campos;
 type Errores = Partial<Record<Campo, string>>;
 
+const anioActual = new Date().getFullYear();
+
 const inicial: Campos = {
   nombre: "",
   rut: "",
-  anio: String(new Date().getFullYear()),
+  anio: String(anioActual - 1),
   semestre: "1",
   fechaExamen: "",
   nota: "",
@@ -60,8 +62,8 @@ function validar(campos: Campos): Errores {
   else if (!validarRut(campos.rut))
     errores.rut = "Revise el RUT y su dígito verificador.";
   const anio = Number(campos.anio);
-  if (!Number.isInteger(anio) || anio < 2000 || anio > 2100)
-    errores.anio = "Ingrese un año entre 2000 y 2100.";
+  if (!Number.isInteger(anio) || anio < 2000 || anio >= anioActual)
+    errores.anio = `Ingrese un año entre 2000 y ${anioActual - 1}.`;
   if (!campos.fechaExamen)
     errores.fechaExamen = "Seleccione la fecha del examen.";
   const nota = Number(campos.nota.replace(",", "."));
@@ -146,6 +148,8 @@ export function NuevoExpedientePage({
       placeholder?: string;
       type?: string;
       inputMode?: "decimal" | "numeric";
+      min?: string;
+      max?: string;
     } = {},
   ) {
     // Un mismo componente de campo mantiene consistentes etiqueta, valor y
@@ -158,6 +162,8 @@ export function NuevoExpedientePage({
           name={campo}
           type={opciones.type ?? "text"}
           inputMode={opciones.inputMode}
+          min={opciones.min}
+          max={opciones.max}
           placeholder={opciones.placeholder}
           value={campos[campo]}
           onChange={(evento) => cambiar(campo, evento.target.value)}
@@ -270,6 +276,8 @@ export function NuevoExpedientePage({
           {campoTexto("anio", "Año de egreso *", {
             type: "number",
             inputMode: "numeric",
+            min: "2000",
+            max: String(anioActual - 1),
           })}
           <label htmlFor="registro-semestre">
             Semestre de egreso *
