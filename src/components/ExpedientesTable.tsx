@@ -61,6 +61,7 @@ export function ExpedientesTable({
                   </span>
                 </button>
               </td>
+<<<<<<< HEAD
               <td>
                 <button
                   type="button"
@@ -106,6 +107,23 @@ export function ExpedientesTable({
                     <span className="acta-no">Pendiente</span>
                   )}
                 </button>
+=======
+              <td className="data-number">{item.rut}</td>
+              <td className="data-number">
+                {item.anioEgreso} · {item.semestreEgreso}º
+              </td>
+              <td>
+                <EstadoBadge estado={item.colegiatura} />
+              </td>
+              <td>
+                {item.acta ? (
+                  <span className="acta-yes">
+                    <Icon name="file" size={17} /> Disponible
+                  </span>
+                ) : (
+                  <span className="acta-no">Pendiente</span>
+                )}
+>>>>>>> 3fa9f830017d47936d7b6ca1c8d60e62a1506d4e
               </td>
               <td>
                 <div className="row-actions">
