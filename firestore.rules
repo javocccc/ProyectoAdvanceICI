@@ -10,8 +10,14 @@ service cloud.firestore {
     }
 
     match /expedientes/{id} {
-      // Incluye crear, consultar, editar y eliminar documentos de expedientes.
-      allow read, write: if esDireccion();
+      allow get, list: if esDireccion();
+      // Todas las escrituras pasan por funciones autenticadas que registran auditoría.
+      allow create, update, delete: if false;
+
+      match /auditoria/{registroId} {
+        allow get, list: if esDireccion();
+        allow create, update, delete: if false;
+      }
     }
 
     match /usuarios/{uid} {

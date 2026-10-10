@@ -1,11 +1,11 @@
 import {
-  arrayUnion,
   collection,
-  doc,
   getDocs,
-  setDoc,
-  updateDoc,
+  limit,
+  orderBy,
+  query,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { demoExpedientes } from "../data/demoExpedientes";
 import type {
   Expediente,
@@ -13,7 +13,7 @@ import type {
   RegistroAuditoria,
 } from "../types/expediente";
 import { limpiarRut } from "../utils/rut";
-import { db } from "./firebase";
+import { db, functions } from "./firebase";
 
 const CLAVE_DEMO = "advance-ici-expedientes-demo";
 
@@ -38,6 +38,28 @@ export async function listarExpedientes(): Promise<Expediente[]> {
   return respuesta.docs.map((item) => item.data() as Expediente);
 }
 
+/** Lee las últimas acciones que Firebase registra de forma inmutable. */
+export async function listarAuditoriaExpediente(
+  id: string,
+): Promise<RegistroAuditoria[]> {
+  if (!db) {
+    return (
+      leerDemo().find((item) => item.id === id)?.historialAuditoria ?? []
+    ).slice(-50).reverse();
+  }
+  const registros = await getDocs(
+    query(
+      collection(db, "expedientes", id, "auditoria"),
+      orderBy("fecha", "desc"),
+      limit(50),
+    ),
+  );
+  return registros.docs.map(
+    (registro) =>
+      ({ id: registro.id, ...registro.data() }) as RegistroAuditoria,
+  );
+}
+
 /** Crea una ficha y rechaza un RUT ya presente tras quitar su puntuación. */
 export async function crearExpediente(
   nuevo: NuevoExpediente,
@@ -60,22 +82,25 @@ export async function crearExpediente(
     historialColegiatura: [],
   };
   if (db) {
-    await setDoc(doc(db, "expedientes", expediente.id), expediente);
-  } else {
-    localStorage.setItem(
-      CLAVE_DEMO,
-      JSON.stringify([expediente, ...existente]),
+    if (!functions) throw new Error("Las funciones de Firebase no están disponibles.");
+    const crear = httpsCallable<{ expediente: NuevoExpediente }, Expediente>(
+      functions,
+      "crearExpediente",
     );
+    const respuesta = await crear({ expediente: nuevo });
+    return respuesta.data;
   }
+  localStorage.setItem(CLAVE_DEMO, JSON.stringify([expediente, ...existente]));
   return expediente;
 }
 
-/** Actualiza una ficha, conserva sus datos no modificados y registra la auditoría. */
+/** Actualiza una ficha; Firebase registra la auditoría desde una función confiable. */
 export async function actualizarExpediente(
   id: string,
   cambios: Partial<Expediente>,
   usuarioEmail: string,
-): Promise<void> {
+  observacionColegiatura?: string,
+): Promise<Partial<Expediente>> {
   const existentes = await listarExpedientes();
   const actual = existentes.find((item) => item.id === id);
   if (!actual) throw new Error("No se encontró el expediente que desea editar.");
@@ -91,7 +116,47 @@ export async function actualizarExpediente(
     throw new Error("Ya existe otro expediente con ese RUT.");
   }
 
-  const camposActualizados = Object.keys(cambios);
+  if (db) {
+    if (!functions) throw new Error("Las funciones de Firebase no están disponibles.");
+    const actualizar = httpsCallable<
+      {
+        id: string;
+        cambios: Partial<Expediente>;
+        observacionColegiatura?: string;
+      },
+      Partial<Expediente>
+    >(functions, "actualizarExpediente");
+    const respuesta = await actualizar({
+      id,
+      cambios,
+      ...(observacionColegiatura
+        ? { observacionColegiatura }
+        : {}),
+    });
+    return respuesta.data;
+  }
+
+  const cambiosLocales = { ...cambios };
+  if (
+    cambiosLocales.colegiatura &&
+    cambiosLocales.colegiatura !== actual.colegiatura
+  ) {
+    const fecha = new Date().toISOString();
+    cambiosLocales.fechaColegiatura = fecha;
+    cambiosLocales.historialColegiatura = [
+      ...actual.historialColegiatura,
+      {
+        estadoAnterior: actual.colegiatura,
+        estadoNuevo: cambiosLocales.colegiatura,
+        fecha,
+        usuario: usuarioEmail,
+        ...(observacionColegiatura?.trim()
+          ? { observacion: observacionColegiatura.trim() }
+          : {}),
+      },
+    ];
+  }
+  const camposActualizados = Object.keys(cambiosLocales);
   const nuevoRegistro: RegistroAuditoria = {
     id: crypto.randomUUID(),
     fecha: new Date().toISOString(),
@@ -101,20 +166,11 @@ export async function actualizarExpediente(
       ? `Campos actualizados: ${camposActualizados.join(", ")}`
       : "Sin cambios detectados",
   };
-
-  if (db) {
-    await updateDoc(doc(db, "expedientes", id), {
-      ...cambios,
-      historialAuditoria: arrayUnion(nuevoRegistro),
-    });
-    return;
-  }
-
   const actualizados = existentes.map((item) =>
     item.id === id
       ? {
           ...item,
-          ...cambios,
+          ...cambiosLocales,
           historialAuditoria: [
             ...(item.historialAuditoria ?? []),
             nuevoRegistro,
@@ -123,4 +179,5 @@ export async function actualizarExpediente(
       : item,
   );
   localStorage.setItem(CLAVE_DEMO, JSON.stringify(actualizados));
+  return cambiosLocales;
 }

@@ -13,6 +13,7 @@ export interface RegistroAuditoria {
   usuario: string;
   accion: string;
   detalles: string;
+  valores?: Record<string, { anterior: unknown; nuevo: unknown }>;
 }
 
 /** Los nombres de la comisión se guardan juntos para evitar campos dispersos. */

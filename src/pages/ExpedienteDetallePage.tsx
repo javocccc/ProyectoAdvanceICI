@@ -10,13 +10,17 @@ import {
   urlActa,
   validarActa,
 } from "../services/actas";
-import { actualizarExpediente } from "../services/expedientes";
+import {
+  actualizarExpediente,
+  listarAuditoriaExpediente,
+} from "../services/expedientes";
 
 import type {
   Expediente,
   EstadoColegiatura,
+  RegistroAuditoria,
 } from "../types/expediente";
-import { formatearFecha } from "../utils/formato";
+import { formatearFecha, formatearFechaHora } from "../utils/formato";
 import "./ExpedienteDetallePage.css";
 
 interface DetalleProps {
@@ -48,6 +52,12 @@ function nombreEstadoColegiatura(estado: EstadoColegiatura): string {
   }
 }
 
+function mostrarValorAuditoria(valor: unknown): string {
+  if (valor === null) return "—";
+  if (typeof valor === "string") return valor;
+  return JSON.stringify(valor) ?? String(valor);
+}
+
 export function ExpedienteDetallePage({
   expediente,
   alVolver,
@@ -63,6 +73,11 @@ export function ExpedienteDetallePage({
   const [observacion, setObservacion] = useState("");
   const [guardandoEstado, setGuardandoEstado] = useState(false);
   const [errorEstado, setErrorEstado] = useState("");
+  const [historialAuditoria, setHistorialAuditoria] = useState<
+    RegistroAuditoria[]
+  >([]);
+  const [cargandoAuditoria, setCargandoAuditoria] = useState(true);
+  const [errorAuditoria, setErrorAuditoria] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [confirmarReemplazo, setConfirmarReemplazo] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
@@ -79,6 +94,7 @@ export function ExpedienteDetallePage({
 
   // Si App entrega otra ficha, reiniciamos campos y avisos de la anterior.
   useEffect(() => {
+    let vigente = true;
     setActual(expediente);
     setEstado(expediente.colegiatura);
     setObservacion("");
@@ -89,13 +105,43 @@ export function ExpedienteDetallePage({
     setProgreso(0);
     setErrorActa("");
     setMensajeActa("");
+    setHistorialAuditoria([]);
+    setCargandoAuditoria(true);
+    setErrorAuditoria("");
+    listarAuditoriaExpediente(expediente.id)
+      .then((registros) => {
+        if (vigente) setHistorialAuditoria(registros);
+      })
+      .catch(() => {
+        if (vigente) {
+          setErrorAuditoria("No se pudo cargar el historial de auditoría.");
+        }
+      })
+      .finally(() => {
+        if (vigente) setCargandoAuditoria(false);
+      });
 
     // Cada URL temporal apunta al PDF de una ficha; se libera al cambiar o cerrar.
     return () => {
+      vigente = false;
       if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
       demoUrl.current = null;
     };
   }, [expediente]);
+
+  async function refrescarAuditoria(expedienteId: string) {
+    try {
+      const registros = await listarAuditoriaExpediente(expedienteId);
+      if (expedienteVisibleId.current === expedienteId) {
+        setHistorialAuditoria(registros);
+        setErrorAuditoria("");
+      }
+    } catch {
+      if (expedienteVisibleId.current === expedienteId) {
+        setErrorAuditoria("El cambio se guardó, pero no se pudo actualizar su auditoría.");
+      }
+    }
+  }
 
   /** Guarda el estado y agrega al historial quién lo cambió, cuándo y por qué. */
   async function guardarColegiatura(evento: FormEvent<HTMLFormElement>) {
@@ -105,37 +151,25 @@ export function ExpedienteDetallePage({
 
     setGuardandoEstado(true);
     setErrorEstado("");
-    // Se añade un evento sin borrar los anteriores. La observación es opcional.
-    const fecha = new Date().toISOString();
     const observacionLimpia = observacion.trim();
-    const historial = [
-      ...actual.historialColegiatura,
-      {
-        estadoAnterior: actual.colegiatura,
-        estadoNuevo: estado,
-        fecha,
-        usuario: usuario.email,
-        ...(observacionLimpia ? { observacion: observacionLimpia } : {}),
-      },
-    ];
     try {
-      await actualizarExpediente(expedienteId, {
-        colegiatura: estado,
-        fechaColegiatura: fecha,
-        historialColegiatura: historial,
-      }, usuario.email);
+      const guardado = await actualizarExpediente(
+        expedienteId,
+        { colegiatura: estado },
+        usuario.email,
+        observacionLimpia,
+      );
       if (expedienteVisibleId.current === expedienteId) {
         setActual((previo) =>
           previo.id === expedienteId
             ? {
                 ...previo,
-                colegiatura: estado,
-                fechaColegiatura: fecha,
-                historialColegiatura: historial,
+                ...guardado,
               }
             : previo,
         );
         setObservacion("");
+        await refrescarAuditoria(expedienteId);
       }
     } catch {
       if (expedienteVisibleId.current === expedienteId) {
@@ -201,6 +235,7 @@ export function ExpedienteDetallePage({
             ? { ...previo, acta: actaGuardada }
             : previo,
         );
+        await refrescarAuditoria(expedienteId);
         if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
         // En demo el PDF vive solo en memoria; el servicio guarda su nombre.
         demoUrl.current = actaGuardada.ruta.startsWith("demo/")
@@ -426,6 +461,40 @@ export function ExpedienteDetallePage({
               </ol>
             ) : (
               <p>Aún no hay cambios registrados.</p>
+            )}
+          </section>
+          <section className="detail-section">
+            <h2>Auditoría del expediente</h2>
+            {errorAuditoria && (
+              <p className="form-error" role="alert">
+                {errorAuditoria}
+              </p>
+            )}
+            {cargandoAuditoria ? (
+              <p>Cargando historial de auditoría…</p>
+            ) : historialAuditoria.length ? (
+              <ol className="historial-lista">
+                {historialAuditoria.map((registro) => (
+                  <li key={registro.id}>
+                    <strong>{registro.accion}</strong>
+                    <span>
+                      {formatearFechaHora(registro.fecha)} · {registro.usuario}
+                    </span>
+                    <p>{registro.detalles}</p>
+                    {registro.valores &&
+                      Object.entries(registro.valores).map(
+                        ([campo, valores]) => (
+                          <p key={campo}>
+                            {campo}: {mostrarValorAuditoria(valores.anterior)}{" "}
+                            → {mostrarValorAuditoria(valores.nuevo)}
+                          </p>
+                        ),
+                      )}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p>Aún no hay acciones auditadas.</p>
             )}
           </section>
           <section className="detail-section">

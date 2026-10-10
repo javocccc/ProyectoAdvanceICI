@@ -17,3 +17,16 @@ export function formatearFecha(iso: string): string {
     timeZone: "UTC",
   }).format(new Date(iso));
 }
+
+/** Incluye la hora para distinguir acciones de auditoría registradas el mismo día. */
+export function formatearFechaHora(iso: string): string {
+  if (!iso) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(iso));
+}
