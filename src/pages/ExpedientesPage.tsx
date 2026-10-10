@@ -6,6 +6,7 @@ import {
   type CursorExpedientes,
   type FiltroExpedientes,
 } from "../services/expedientes";
+import { mensajeErrorAlmacenamientoDemo } from "../services/almacenamientoDemo";
 import type { Expediente } from "../types/expediente";
 
 interface ExpedientesProps {
@@ -53,8 +54,13 @@ export function ExpedientesPage({
           setTotal(pagina.total);
           setSiguienteCursor(pagina.siguienteCursor);
         })
-        .catch(() => {
-          if (vigente) setError("No fue posible cargar los expedientes.");
+        .catch((problema: unknown) => {
+          if (vigente) {
+            setError(
+              mensajeErrorAlmacenamientoDemo(problema) ??
+                "No fue posible cargar los expedientes.",
+            );
+          }
         })
         .finally(() => {
           if (vigente) setCargando(false);

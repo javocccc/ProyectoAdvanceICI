@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "./components/Icon";
 import { useAuth } from "./context/AuthContext";
 import { obtenerExpediente } from "./services/expedientes";
+import { mensajeErrorAlmacenamientoDemo } from "./services/almacenamientoDemo";
 import { firebaseConfigurado } from "./services/firebase";
 import type { Expediente } from "./types/expediente";
 import { ExpedienteDetallePage } from "./pages/ExpedienteDetallePage";
@@ -45,8 +46,13 @@ export default function App() {
           );
         }
       })
-      .catch(() => {
-        if (vigente) setErrorDatos("No fue posible cargar los expedientes.");
+      .catch((problema: unknown) => {
+        if (vigente) {
+          setErrorDatos(
+            mensajeErrorAlmacenamientoDemo(problema) ??
+              "No fue posible cargar los expedientes.",
+          );
+        }
       })
       .finally(() => {
         if (vigente) setCargandoExpediente(false);

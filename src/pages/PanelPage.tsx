@@ -6,6 +6,7 @@ import {
   obtenerResumenExpedientes,
   type ResumenExpedientes,
 } from "../services/expedientes";
+import { mensajeErrorAlmacenamientoDemo } from "../services/almacenamientoDemo";
 
 interface PanelProps {
   alBuscar: (texto: string) => void;
@@ -35,9 +36,12 @@ export function PanelPage({
           setErrorResumen("");
         }
       })
-      .catch(() => {
+      .catch((problema: unknown) => {
         if (vigente) {
-          setErrorResumen("No fue posible cargar el resumen de expedientes.");
+          setErrorResumen(
+            mensajeErrorAlmacenamientoDemo(problema) ??
+              "No fue posible cargar el resumen de expedientes.",
+          );
         }
       });
     return () => {
@@ -81,8 +85,14 @@ export function PanelPage({
         <div className="overview-statement">
           <span className="statement-line" />
           <p>
-            Hay <strong>{pendientesPago} expedientes</strong> que
-            necesitan revisar su colegiatura antes de continuar.
+            {resumen ? (
+              <>
+                Hay <strong>{pendientesPago} expedientes</strong> que
+                necesitan revisar su colegiatura antes de continuar.
+              </>
+            ) : (
+              "El resumen de expedientes no está disponible."
+            )}
           </p>
           <button type="button" onClick={alVerTodos}>
             Revisar expedientes <Icon name="arrow" size={18} />
@@ -91,15 +101,17 @@ export function PanelPage({
         <div className="overview-figures">
           <div>
             <span>Total expedientes</span>
-            <strong>{String(total).padStart(2, "0")}</strong>
+            <strong>{resumen ? String(total).padStart(2, "0") : "—"}</strong>
           </div>
           <div>
             <span>Colegiatura pendiente</span>
-            <strong>{String(pendientesPago).padStart(2, "0")}</strong>
+            <strong>
+              {resumen ? String(pendientesPago).padStart(2, "0") : "—"}
+            </strong>
           </div>
           <div>
             <span>Actas pendientes</span>
-            <strong>{String(sinActa).padStart(2, "0")}</strong>
+            <strong>{resumen ? String(sinActa).padStart(2, "0") : "—"}</strong>
           </div>
         </div>
       </section>
@@ -141,11 +153,19 @@ export function PanelPage({
                 Ver todos <Icon name="arrow" size={17} />
               </button>
             </div>
-            <ExpedientesTable
-              expedientes={resumen?.recientes ?? []}
-              alAbrir={alAbrir}
-              alEditar={alEditar}
-            />
+            {resumen ? (
+              <ExpedientesTable
+                expedientes={resumen.recientes}
+                alAbrir={alAbrir}
+                alEditar={alEditar}
+              />
+            ) : errorResumen ? (
+              <p className="data-error" role="alert">
+                No se pudieron cargar los expedientes recientes.
+              </p>
+            ) : (
+              <p>Cargando expedientes recientes…</p>
+            )}
           </section>
         </div>
         <aside className="side-column" aria-labelledby="attention-title">
@@ -161,7 +181,7 @@ export function PanelPage({
           <div className="attention-list">
             <div className="attention-item">
               <span className="attention-count">
-                {String(pendientesPago).padStart(2, "0")}
+                {resumen ? String(pendientesPago).padStart(2, "0") : "—"}
               </span>
               <div>
                 <strong>Colegiatura por revisar</strong>
@@ -170,7 +190,7 @@ export function PanelPage({
             </div>
             <div className="attention-item">
               <span className="attention-count">
-                {String(sinActa).padStart(2, "0")}
+                {resumen ? String(sinActa).padStart(2, "0") : "—"}
               </span>
               <div>
                 <strong>Actas por adjuntar</strong>

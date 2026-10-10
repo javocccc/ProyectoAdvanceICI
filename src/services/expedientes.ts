@@ -16,7 +16,6 @@ import type {
   QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { demoExpedientes } from "../data/demoExpedientes";
 import type {
   Expediente,
   NuevoExpediente,
@@ -24,8 +23,11 @@ import type {
 } from "../types/expediente";
 import { limpiarRut } from "../utils/rut";
 import { db, functions } from "./firebase";
+import {
+  guardarExpedientesDemo,
+  leerExpedientesDemo,
+} from "./almacenamientoDemo";
 
-const CLAVE_DEMO = "advance-ici-expedientes-demo";
 const TAMANO_PAGINA = 20;
 
 export type FiltroExpedientes = "todos" | Expediente["colegiatura"];
@@ -56,27 +58,13 @@ function normalizarBusqueda(texto: string): string {
     .replace(/\s+/g, " ");
 }
 
-// Este servicio concentra el almacenamiento. Las páginas no necesitan saber
-// si los datos vienen del navegador o de la colección "expedientes".
-/** Lee las fichas de demostración. Sin datos guardados o con JSON inválido, usa los ejemplos iniciales. */
-function leerDemo(): Expediente[] {
-  try {
-    const guardados = localStorage.getItem(CLAVE_DEMO);
-    if (!guardados) return demoExpedientes;
-    const datos: unknown = JSON.parse(guardados);
-    return Array.isArray(datos) ? (datos as Expediente[]) : demoExpedientes;
-  } catch {
-    return demoExpedientes;
-  }
-}
-
 function filtrarDemo(
   busqueda: string,
   filtro: FiltroExpedientes,
 ): Expediente[] {
   const termino = normalizarBusqueda(busqueda);
   const terminoRut = limpiarRut(busqueda);
-  return leerDemo().filter((expediente) => {
+  return leerExpedientesDemo().filter((expediente) => {
     const nombre = normalizarBusqueda(expediente.nombre);
     const coincideTexto =
       !termino ||
@@ -150,7 +138,8 @@ export async function obtenerPaginaExpedientes(
 export async function obtenerExpediente(
   id: string,
 ): Promise<Expediente | null> {
-  if (!db) return leerDemo().find((item) => item.id === id) ?? null;
+  if (!db)
+    return leerExpedientesDemo().find((item) => item.id === id) ?? null;
   const respuesta = await getDoc(doc(db, "expedientes", id));
   return respuesta.exists() ? (respuesta.data() as Expediente) : null;
 }
@@ -161,7 +150,9 @@ export async function buscarExpedientePorRut(
 ): Promise<Expediente | null> {
   if (!db) {
     return (
-      leerDemo().find((item) => limpiarRut(item.rut) === limpiarRut(rut)) ??
+      leerExpedientesDemo().find(
+        (item) => limpiarRut(item.rut) === limpiarRut(rut),
+      ) ??
       null
     );
   }
@@ -180,7 +171,7 @@ export async function buscarExpedientePorRut(
 /** Obtiene las cifras del panel con agregaciones, sin leer todos los documentos. */
 export async function obtenerResumenExpedientes(): Promise<ResumenExpedientes> {
   if (!db) {
-    const expedientes = leerDemo();
+    const expedientes = leerExpedientesDemo();
     return {
       total: expedientes.length,
       pendientesColegiatura: expedientes.filter(
@@ -225,7 +216,8 @@ export async function listarAuditoriaExpediente(
 ): Promise<RegistroAuditoria[]> {
   if (!db) {
     return (
-      leerDemo().find((item) => item.id === id)?.historialAuditoria ?? []
+      leerExpedientesDemo().find((item) => item.id === id)
+        ?.historialAuditoria ?? []
     ).slice(-50).reverse();
   }
   const registros = await getDocs(
@@ -262,13 +254,13 @@ export async function crearExpediente(
     const respuesta = await crear({ expediente: nuevo });
     return respuesta.data;
   }
-  const existente = leerDemo();
+  const existente = leerExpedientesDemo();
   if (
     existente.some((item) => limpiarRut(item.rut) === limpiarRut(nuevo.rut))
   ) {
     throw new Error("Ya existe un expediente con ese RUT.");
   }
-  localStorage.setItem(CLAVE_DEMO, JSON.stringify([expediente, ...existente]));
+  guardarExpedientesDemo([expediente, ...existente]);
   return expediente;
 }
 
@@ -299,7 +291,7 @@ export async function actualizarExpediente(
     return respuesta.data;
   }
 
-  const existentes = leerDemo();
+  const existentes = leerExpedientesDemo();
   const actual = existentes.find((item) => item.id === id);
   if (!actual) throw new Error("No se encontró el expediente que desea editar.");
   const rutActualizado = cambios.rut;
@@ -354,6 +346,6 @@ export async function actualizarExpediente(
         }
       : item,
   );
-  localStorage.setItem(CLAVE_DEMO, JSON.stringify(actualizados));
+  guardarExpedientesDemo(actualizados);
   return cambiosLocales;
 }
