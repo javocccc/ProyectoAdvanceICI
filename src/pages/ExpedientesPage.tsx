@@ -1,50 +1,76 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ExpedientesTable } from "../components/ExpedientesTable";
 import { Icon } from "../components/Icon";
-import type { Expediente, EstadoColegiatura } from "../types/expediente";
-
-type Filtro = "todos" | EstadoColegiatura;
+import {
+  obtenerPaginaExpedientes,
+  type CursorExpedientes,
+  type FiltroExpedientes,
+} from "../services/expedientes";
+import type { Expediente } from "../types/expediente";
 
 interface ExpedientesProps {
-  // App aporta los registros y recibe el id cuando alguien abre una ficha.
-  expedientes: Expediente[];
   busquedaInicial: string;
   alAbrir: (id: string) => void;
   alEditar: (id: string) => void;
   alNuevo: () => void;
 }
 
-/** Quita tildes y diferencias entre mayúsculas para facilitar la búsqueda. */
-function normalizar(texto: string) {
-  return texto
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
 export function ExpedientesPage({
-  expedientes,
   busquedaInicial,
   alAbrir,
   alEditar,
   alNuevo,
 }: ExpedientesProps) {
-  // La búsqueda del panel llega como valor inicial; aquí puede seguir editándose.
   const [busqueda, setBusqueda] = useState(busquedaInicial);
-  const [filtro, setFiltro] = useState<Filtro>("todos");
-  // useMemo recalcula la lista visible cuando cambia la lista, el texto o el
-  // filtro. No modifica los expedientes originales recibidos por props.
-  const visibles = useMemo(
-    () =>
-      expedientes.filter((item) => {
-        const coincide = normalizar(`${item.nombre} ${item.rut}`).includes(
-          normalizar(busqueda),
-        );
-        return coincide && (filtro === "todos" || item.colegiatura === filtro);
-      }),
-    [expedientes, busqueda, filtro],
-  );
+  const [filtro, setFiltro] = useState<FiltroExpedientes>("todos");
+  const [cursores, setCursores] = useState<CursorExpedientes[]>([null]);
+  const [indiceCursor, setIndiceCursor] = useState(0);
+  const [expedientes, setExpedientes] = useState<Expediente[]>([]);
+  const [total, setTotal] = useState(0);
+  const [siguienteCursor, setSiguienteCursor] =
+    useState<CursorExpedientes>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setCursores([null]);
+    setIndiceCursor(0);
+  }, [busqueda, filtro]);
+
+  useEffect(() => {
+    let vigente = true;
+    setCargando(true);
+    setError("");
+    const espera = window.setTimeout(() => {
+      void obtenerPaginaExpedientes(
+        busqueda,
+        filtro,
+        cursores[indiceCursor] ?? null,
+      )
+        .then((pagina) => {
+          if (!vigente) return;
+          setExpedientes(pagina.expedientes);
+          setTotal(pagina.total);
+          setSiguienteCursor(pagina.siguienteCursor);
+        })
+        .catch(() => {
+          if (vigente) setError("No fue posible cargar los expedientes.");
+        })
+        .finally(() => {
+          if (vigente) setCargando(false);
+        });
+    }, busqueda ? 250 : 0);
+    return () => {
+      vigente = false;
+      window.clearTimeout(espera);
+    };
+  }, [busqueda, filtro, cursores, indiceCursor]);
+
+  function avanzarPagina() {
+    if (!siguienteCursor) return;
+    setCursores((actuales) => [...actuales.slice(0, indiceCursor + 1), siguienteCursor]);
+    setIndiceCursor((actual) => actual + 1);
+  }
 
   return (
     <>
@@ -66,15 +92,16 @@ export function ExpedientesPage({
         <div className="listing-toolbar">
           <label className="list-search">
             <Icon name="search" size={20} />
-            <span className="sr-only">Buscar por nombre o RUT</span>
+            <span className="sr-only">Buscar por inicio del nombre o RUT</span>
             <input
-              placeholder="Buscar por nombre o RUT"
+              placeholder="Inicio del nombre o RUT (mín. 2 caracteres)"
               value={busqueda}
+              maxLength={30}
               onChange={(e) => setBusqueda(e.target.value)}
             />
           </label>
-          <span className="results-count">
-            {visibles.length} resultado{visibles.length === 1 ? "" : "s"}
+          <span className="results-count" aria-live="polite">
+            {total} resultado{total === 1 ? "" : "s"}
           </span>
         </div>
         <div
@@ -101,11 +128,38 @@ export function ExpedientesPage({
             </button>
           ))}
         </div>
-        <ExpedientesTable
-          expedientes={visibles}
-          alAbrir={alAbrir}
-          alEditar={alEditar}
-        />
+        {error ? (
+          <p className="data-error" role="alert">{error}</p>
+        ) : cargando ? (
+          <div className="content-loading">Cargando expedientes…</div>
+        ) : (
+          <>
+            <ExpedientesTable
+              expedientes={expedientes}
+              alAbrir={alAbrir}
+              alEditar={alEditar}
+            />
+            <nav className="pagination" aria-label="Páginas de expedientes">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={indiceCursor === 0 || cargando}
+                onClick={() => setIndiceCursor((actual) => actual - 1)}
+              >
+                Anterior
+              </button>
+              <span>Página {indiceCursor + 1}</span>
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={!siguienteCursor || cargando}
+                onClick={avanzarPagina}
+              >
+                Siguiente
+              </button>
+            </nav>
+          </>
+        )}
       </section>
     </>
   );

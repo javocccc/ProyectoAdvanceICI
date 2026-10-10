@@ -5,6 +5,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import {
   describirCambioAuditable,
   esRutDuplicado,
+  generarTokensBusqueda,
   normalizarRut,
   validarRut,
 } from "./domain";
@@ -273,21 +274,18 @@ export const crearExpediente = onCall(async (request) => {
     creadoPor: usuario.email,
     historialColegiatura: [],
     rutNormalizado,
+    busquedaTokens: generarTokensBusqueda(
+      datos.nombre as string,
+      datos.rut as string,
+    ),
+    actaPendiente: true,
   };
   await db.runTransaction(async (transaccion) => {
-    const [indice, existentes] = await Promise.all([
-      transaccion.get(rutRef),
-      transaccion.get(db.collection("expedientes")),
-    ]);
-    const expedientesConRut = existentes.docs.map((documento) => ({
-      id: documento.id,
-      rut: documento.get("rut"),
-      rutNormalizado: documento.get("rutNormalizado"),
-    }));
+    const indice = await transaccion.get(rutRef);
     if (
       esRutDuplicado(
         rutNormalizado,
-        expedientesConRut,
+        [],
         indice.data()?.expedienteId,
       )
     ) {
@@ -343,25 +341,15 @@ export const actualizarExpediente = onCall(async (request) => {
         const indiceAnteriorRef = rutAnterior
           ? db.collection("rutIndex").doc(rutAnterior)
           : null;
-        const [nuevoIndice, indiceAnterior, existentes] = await Promise.all([
+        const [nuevoIndice, indiceAnterior] = await Promise.all([
           transaccion.get(nuevoIndiceRef),
           indiceAnteriorRef
             ? transaccion.get(indiceAnteriorRef)
             : Promise.resolve(null),
-          transaccion.get(db.collection("expedientes")),
         ]);
-        const expedientesConRut = existentes.docs.map((documento) => ({
-          id: documento.id,
-          rut: documento.get("rut"),
-          rutNormalizado: documento.get("rutNormalizado"),
-        }));
+        const propietarioNuevo = nuevoIndice.data()?.expedienteId;
         if (
-          esRutDuplicado(
-            rutNuevo,
-            expedientesConRut,
-            nuevoIndice.data()?.expedienteId,
-            id,
-          )
+          esRutDuplicado(rutNuevo, [], propietarioNuevo, id)
         ) {
           throw new HttpsError(
             "already-exists",
@@ -377,6 +365,33 @@ export const actualizarExpediente = onCall(async (request) => {
         ) {
           transaccion.delete(indiceAnteriorRef);
         }
+      }
+      if (typeof nuevosCambios.nombre === "string") {
+        const rutActual =
+          typeof nuevosCambios.rut === "string"
+            ? nuevosCambios.rut
+            : typeof actual.rut === "string"
+              ? actual.rut
+              : "";
+        nuevosCambios.busquedaTokens = generarTokensBusqueda(
+          nuevosCambios.nombre,
+          rutActual,
+        );
+      }
+      if (typeof nuevosCambios.rut === "string") {
+        const nombreActual =
+          typeof nuevosCambios.nombre === "string"
+            ? nuevosCambios.nombre
+            : typeof actual.nombre === "string"
+              ? actual.nombre
+              : "";
+        nuevosCambios.busquedaTokens = generarTokensBusqueda(
+          nombreActual,
+          nuevosCambios.rut,
+        );
+      }
+      if (nuevosCambios.acta !== undefined) {
+        nuevosCambios.actaPendiente = false;
       }
     }
 

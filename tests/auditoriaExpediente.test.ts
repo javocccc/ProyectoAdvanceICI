@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   describirCambioAuditable,
   esRutDuplicado,
+  generarTokensBusqueda,
   validarRut,
 } from "../functions/src/domain";
 
@@ -50,5 +51,13 @@ describe("reglas del servidor para expedientes", () => {
         rut: { anterior: "11.111.111-1", nuevo: "12.345.678-5" },
       },
     });
+  });
+
+  it("genera tokens de búsqueda por prefijo sin tildes y normaliza el RUT", () => {
+    const tokens = generarTokensBusqueda("María José Pérez", "12.345.678-5");
+    expect(tokens).toContain("maria");
+    expect(tokens).toContain("jose");
+    expect(tokens).toContain("perez");
+    expect(tokens).toContain("123456785");
   });
 });

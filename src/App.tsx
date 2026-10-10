@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./components/Icon";
 import { useAuth } from "./context/AuthContext";
-import { listarExpedientes } from "./services/expedientes";
+import { obtenerExpediente } from "./services/expedientes";
 import { firebaseConfigurado } from "./services/firebase";
 import type { Expediente } from "./types/expediente";
 import { ExpedienteDetallePage } from "./pages/ExpedienteDetallePage";
@@ -16,40 +16,45 @@ type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle";
 export default function App() {
   // useAuth lee el valor que AuthProvider publicó desde main.tsx.
   const { usuario, cargando, salir } = useAuth();
-  // App conserva la navegación y la lista; pasa datos y acciones a cada página
-  // mediante props (por ejemplo, alAbrir recibe el id del expediente elegido).
+  // App conserva la navegación y la ficha seleccionada; los listados consultan
+  // sus páginas directamente al servicio de datos.
   const [vista, setVista] = useState<Vista>("panel");
   const [historial, setHistorial] = useState<Vista[]>([]);
-  const [expedientes, setExpedientes] = useState<Expediente[]>([]);
+  const [expedienteActual, setExpedienteActual] =
+    useState<Expediente | null>(null);
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [cargandoDatos, setCargandoDatos] = useState(false);
+  const [cargandoExpediente, setCargandoExpediente] = useState(false);
   const [errorDatos, setErrorDatos] = useState("");
   const [menuAbierto, setMenuAbierto] = useState(false);
 
-  // Al cambiar de pantalla se vuelve a leer el servicio; "vigente" evita
-  // actualizar una pantalla que ya fue desmontada.
+  // Las fichas se cargan individualmente al abrir o editar, nunca descargando
+  // la colección completa desde App.
   useEffect(() => {
-    if (!usuario) return;
+    if (!usuario || !seleccionado || (vista !== "detalle" && vista !== "editar"))
+      return;
     let vigente = true;
-    setCargandoDatos(true);
-    listarExpedientes()
-      .then((datos) => {
+    setErrorDatos("");
+    setCargandoExpediente(true);
+    obtenerExpediente(seleccionado)
+      .then((expediente) => {
         if (vigente) {
-          setExpedientes(datos);
-          setErrorDatos("");
+          setExpedienteActual(expediente);
+          setErrorDatos(
+            expediente ? "" : "No se encontró el expediente solicitado.",
+          );
         }
       })
       .catch(() => {
         if (vigente) setErrorDatos("No fue posible cargar los expedientes.");
       })
       .finally(() => {
-        if (vigente) setCargandoDatos(false);
+        if (vigente) setCargandoExpediente(false);
       });
     return () => {
       vigente = false;
     };
-  }, [usuario, vista]);
+  }, [usuario, vista, seleccionado]);
 
   /** Cambia la pantalla visible y cierra el menú móvil. */
   function navegar(destino: Vista) {
@@ -86,8 +91,6 @@ export default function App() {
     setBusqueda(texto);
     navegar("expedientes");
   }
-  const expedienteActual = expedientes.find((item) => item.id === seleccionado);
-
   // Primero se resuelve la sesión; después se decide entre login y aplicación.
   if (cargando)
     return <div className="startup-loading">Cargando Advance ICI…</div>;
@@ -210,13 +213,13 @@ export default function App() {
               {errorDatos}
             </p>
           )}
-          {cargandoDatos && expedientes.length === 0 ? (
+          {cargandoExpediente &&
+          (vista === "detalle" || vista === "editar") ? (
             <div className="content-loading">Cargando expedientes…</div>
           ) : (
             <>
               {vista === "panel" && (
                 <PanelPage
-                  expedientes={expedientes}
                   alBuscar={buscar}
                   alAbrir={abrir}
                   alEditar={editar}
@@ -227,7 +230,6 @@ export default function App() {
               {vista === "expedientes" && (
                 <ExpedientesPage
                   key={busqueda}
-                  expedientes={expedientes}
                   busquedaInicial={busqueda}
                   alAbrir={abrir}
                   alEditar={editar}

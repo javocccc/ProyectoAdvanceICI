@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { ExpedientesTable } from "../components/ExpedientesTable";
-import type { Expediente } from "../types/expediente";
+import {
+  obtenerResumenExpedientes,
+  type ResumenExpedientes,
+} from "../services/expedientes";
 
 interface PanelProps {
-  // App entrega la lista y las acciones; el panel solo presenta un resumen.
-  expedientes: Expediente[];
   alBuscar: (texto: string) => void;
   alAbrir: (id: string) => void;
   alEditar: (id: string) => void;
@@ -15,7 +16,6 @@ interface PanelProps {
 }
 
 export function PanelPage({
-  expedientes,
   alBuscar,
   alAbrir,
   alEditar,
@@ -23,23 +23,36 @@ export function PanelPage({
   alVerTodos,
 }: PanelProps) {
   const [texto, setTexto] = useState("");
-  // Estas cifras se calculan de la lista recibida, no se guardan por separado.
-  // "Sin informar" también cuenta como pendiente de revisión.
-  const pendientesPago = expedientes.filter(
-    (item) =>
-      item.colegiatura === "no-al-dia" || item.colegiatura === "sin-informar",
-  );
-  const sinActa = expedientes.filter((item) => !item.acta);
-  // La copia evita alterar el orden de la lista que App comparte con otras páginas.
-  const recientes = [...expedientes]
-    .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))
-    .slice(0, 5);
+  const [resumen, setResumen] = useState<ResumenExpedientes | null>(null);
+  const [errorResumen, setErrorResumen] = useState("");
+
+  useEffect(() => {
+    let vigente = true;
+    obtenerResumenExpedientes()
+      .then((datos) => {
+        if (vigente) {
+          setResumen(datos);
+          setErrorResumen("");
+        }
+      })
+      .catch(() => {
+        if (vigente) {
+          setErrorResumen("No fue posible cargar el resumen de expedientes.");
+        }
+      });
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   /** Entrega el texto a App, que abre la lista con esa búsqueda inicial. */
   function buscar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     alBuscar(texto);
   }
+  const total = resumen?.total ?? 0;
+  const pendientesPago = resumen?.pendientesColegiatura ?? 0;
+  const sinActa = resumen?.pendientesActa ?? 0;
 
   return (
     <>
@@ -59,10 +72,16 @@ export function PanelPage({
       </div>
 
       <section className="overview-intro" aria-label="Resumen de expedientes">
+        {errorResumen && (
+          <p className="data-error" role="alert">{errorResumen}</p>
+        )}
+        {!resumen && !errorResumen && (
+          <p className="content-loading">Cargando resumen…</p>
+        )}
         <div className="overview-statement">
           <span className="statement-line" />
           <p>
-            Hay <strong>{pendientesPago.length} expedientes</strong> que
+            Hay <strong>{pendientesPago} expedientes</strong> que
             necesitan revisar su colegiatura antes de continuar.
           </p>
           <button type="button" onClick={alVerTodos}>
@@ -72,15 +91,15 @@ export function PanelPage({
         <div className="overview-figures">
           <div>
             <span>Total expedientes</span>
-            <strong>{String(expedientes.length).padStart(2, "0")}</strong>
+            <strong>{String(total).padStart(2, "0")}</strong>
           </div>
           <div>
             <span>Colegiatura pendiente</span>
-            <strong>{String(pendientesPago.length).padStart(2, "0")}</strong>
+            <strong>{String(pendientesPago).padStart(2, "0")}</strong>
           </div>
           <div>
             <span>Actas pendientes</span>
-            <strong>{String(sinActa.length).padStart(2, "0")}</strong>
+            <strong>{String(sinActa).padStart(2, "0")}</strong>
           </div>
         </div>
       </section>
@@ -123,7 +142,7 @@ export function PanelPage({
               </button>
             </div>
             <ExpedientesTable
-              expedientes={recientes}
+              expedientes={resumen?.recientes ?? []}
               alAbrir={alAbrir}
               alEditar={alEditar}
             />
@@ -142,7 +161,7 @@ export function PanelPage({
           <div className="attention-list">
             <div className="attention-item">
               <span className="attention-count">
-                {String(pendientesPago.length).padStart(2, "0")}
+                {String(pendientesPago).padStart(2, "0")}
               </span>
               <div>
                 <strong>Colegiatura por revisar</strong>
@@ -151,7 +170,7 @@ export function PanelPage({
             </div>
             <div className="attention-item">
               <span className="attention-count">
-                {String(sinActa.length).padStart(2, "0")}
+                {String(sinActa).padStart(2, "0")}
               </span>
               <div>
                 <strong>Actas por adjuntar</strong>

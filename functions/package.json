@@ -6,7 +6,8 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "migrate:indexes": "node lib/migrateIndexes.js"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",

@@ -26,6 +26,32 @@ export function normalizarRut(rut: string): string {
   return rut.replace(/[.\-\s]/g, "").toUpperCase();
 }
 
+export function normalizarTextoBusqueda(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function generarTokensBusqueda(nombre: string, rut: string): string[] {
+  const tokens = new Set<string>();
+  const agregarPrefijos = (valor: string) => {
+    for (let largo = 2; largo <= valor.length && largo <= 30; largo += 1) {
+      tokens.add(valor.slice(0, largo));
+    }
+  };
+
+  const nombreNormalizado = normalizarTextoBusqueda(nombre);
+  agregarPrefijos(nombreNormalizado);
+  for (const palabra of nombreNormalizado.split(" ")) {
+    agregarPrefijos(palabra);
+  }
+  agregarPrefijos(normalizarRut(rut));
+  return [...tokens];
+}
+
 export function validarRut(rut: string): boolean {
   const limpio = normalizarRut(rut);
   if (!/^\d{7,8}[\dK]$/.test(limpio)) return false;

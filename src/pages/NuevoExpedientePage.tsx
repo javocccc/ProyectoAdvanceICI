@@ -4,15 +4,15 @@ import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
 import {
   actualizarExpediente,
+  buscarExpedientePorRut,
   crearExpediente,
-  listarExpedientes,
 } from "../services/expedientes";
 import type {
   DatosEditablesExpediente,
   Expediente,
   NuevoExpediente,
 } from "../types/expediente";
-import { formatearRut, limpiarRut } from "../utils/rut";
+import { formatearRut } from "../utils/rut";
 import {
   validarCamposRegistro,
   type CampoRegistro,
@@ -177,9 +177,7 @@ export function NuevoExpedientePage({
       if (mensaje.includes("Ya existe")) {
         try {
           // Ofrece abrir la ficha existente sin perder el aviso de duplicado.
-          const existente = (await listarExpedientes()).find(
-            (item) => limpiarRut(item.rut) === limpiarRut(campos.rut),
-          );
+          const existente = await buscarExpedientePorRut(campos.rut);
           setIdExistente(existente?.id ?? null);
         } catch {
           /* El aviso de duplicado sigue siendo visible. */
