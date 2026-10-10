@@ -19,8 +19,7 @@ export default function App() {
   // App conserva la navegación y la lista; pasa datos y acciones a cada página
   // mediante props (por ejemplo, alAbrir recibe el id del expediente elegido).
   const [vista, setVista] = useState<Vista>("panel");
-  const [volverTrasEditar, setVolverTrasEditar] =
-    useState<Vista>("expedientes");
+  const [historial, setHistorial] = useState<Vista[]>([]);
   const [expedientes, setExpedientes] = useState<Expediente[]>([]);
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
@@ -54,7 +53,17 @@ export default function App() {
 
   /** Cambia la pantalla visible y cierra el menú móvil. */
   function navegar(destino: Vista) {
+    if (destino !== vista)
+      setHistorial((anterior) => [...anterior, vista]);
     setVista(destino);
+    setMenuAbierto(false);
+  }
+  /** Regresa a la última pantalla visitada sin volver a agregarla al historial. */
+  function volver() {
+    const anterior = historial[historial.length - 1];
+    if (!anterior) return;
+    setHistorial((actual) => actual.slice(0, -1));
+    setVista(anterior);
     setMenuAbierto(false);
   }
   /** La tabla entrega un id; la ficha busca ese expediente en la lista. */
@@ -63,15 +72,14 @@ export default function App() {
     navegar("detalle");
   }
   /** Abre el formulario de edición para la ficha elegida. */
-  function editar(id: string, regresarA: Vista) {
+  function editar(id: string) {
     setSeleccionado(id);
-    setVolverTrasEditar(regresarA);
     navegar("editar");
   }
   /** Guarda la selección y vuelve al contexto desde el que se inició la edición. */
   function despuesDeEditar(id: string) {
     setSeleccionado(id);
-    navegar(volverTrasEditar);
+    volver();
   }
   /** Envía la búsqueda del panel a la pantalla de expedientes. */
   function buscar(texto: string) {
@@ -159,6 +167,17 @@ export default function App() {
       <div className="workspace">
         <header className="topbar">
           <button
+            className="topbar-back"
+            type="button"
+            onClick={volver}
+            disabled={historial.length === 0}
+            aria-label="Volver a la página anterior"
+            title="Volver a la página anterior"
+          >
+            <Icon name="arrow" size={18} />
+            <span>Volver</span>
+          </button>
+          <button
             type="button"
             className="mobile-menu"
             aria-label={menuAbierto ? "Cerrar menú" : "Abrir menú"}
@@ -200,7 +219,7 @@ export default function App() {
                   expedientes={expedientes}
                   alBuscar={buscar}
                   alAbrir={abrir}
-                  alEditar={(id) => editar(id, "panel")}
+                  alEditar={editar}
                   alNuevo={() => navegar("nuevo")}
                   alVerTodos={() => navegar("expedientes")}
                 />
@@ -211,13 +230,13 @@ export default function App() {
                   expedientes={expedientes}
                   busquedaInicial={busqueda}
                   alAbrir={abrir}
-                  alEditar={(id) => editar(id, "expedientes")}
+                  alEditar={editar}
                   alNuevo={() => navegar("nuevo")}
                 />
               )}
               {vista === "nuevo" && (
                 <NuevoExpedientePage
-                  alCancelar={() => navegar("expedientes")}
+                  alCancelar={volver}
                   alGuardar={abrir}
                 />
               )}
@@ -225,15 +244,15 @@ export default function App() {
                 <NuevoExpedientePage
                   key={expedienteActual.id}
                   expediente={expedienteActual}
-                  alCancelar={() => navegar(volverTrasEditar)}
+                  alCancelar={volver}
                   alGuardar={despuesDeEditar}
                 />
               )}
               {vista === "detalle" && expedienteActual && (
                 <ExpedienteDetallePage
                   expediente={expedienteActual}
-                  alVolver={() => navegar("expedientes")}
-                  alEditar={() => editar(expedienteActual.id, "detalle")}
+                  alVolver={volver}
+                  alEditar={() => editar(expedienteActual.id)}
                 />
               )}
             </>

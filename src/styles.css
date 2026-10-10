@@ -492,6 +492,30 @@ select {
   background: #fff;
   border-bottom: 1px solid var(--line);
 }
+.topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  margin-right: 18px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+}
+.topbar-back:hover:not(:disabled) {
+  background: #f3f6ff;
+}
+.topbar-back:disabled {
+  color: #98a3b2;
+  cursor: default;
+}
+.topbar-back svg {
+  transform: rotate(180deg);
+}
 .breadcrumb,
 .topbar-right {
   display: flex;
@@ -1324,7 +1348,12 @@ select {
   .mobile-menu {
     display: grid;
     place-items: center;
-    margin-right: 12px;
+    margin: 0 8px 0 0;
+  }
+  .topbar-back {
+    gap: 4px;
+    margin-right: 8px;
+    padding: 7px 8px;
   }
   .breadcrumb {
     margin-right: auto;
