@@ -824,7 +824,6 @@ select {
   font-size: 11px;
   margin-top: 4px;
 }
-<<<<<<< HEAD
 .table-cell-link {
   display: inline-flex;
   align-items: center;
@@ -846,8 +845,6 @@ select {
   outline-offset: 3px;
   border-radius: 3px;
 }
-=======
->>>>>>> 3fa9f830017d47936d7b6ca1c8d60e62a1506d4e
 .student-avatar {
   display: grid;
   place-items: center;
