@@ -2,6 +2,12 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
+import {
+  describirCambioAuditable,
+  esRutDuplicado,
+  normalizarRut,
+  validarRut,
+} from "./domain";
 
 initializeApp();
 setGlobalOptions({ region: "us-central1" });
@@ -49,26 +55,6 @@ function exigirTexto(
     throw new HttpsError("invalid-argument", `El campo ${campo} no es válido.`);
   }
   return valor.trim();
-}
-
-function normalizarRut(rut: string): string {
-  return rut.replace(/[.\-\s]/g, "").toUpperCase();
-}
-
-function esRutConFormato(rut: string): boolean {
-  const limpio = normalizarRut(rut);
-  if (!/^\d{7,8}[\dK]$/.test(limpio)) return false;
-  const cuerpo = limpio.slice(0, -1);
-  let suma = 0;
-  let factor = 2;
-  for (let i = cuerpo.length - 1; i >= 0; i -= 1) {
-    suma += Number(cuerpo[i]) * factor;
-    factor = factor === 7 ? 2 : factor + 1;
-  }
-  const resto = 11 - (suma % 11);
-  const verificador =
-    resto === 11 ? "0" : resto === 10 ? "K" : String(resto);
-  return verificador === limpio.slice(-1);
 }
 
 function validarComision(valor: unknown): Record<string, unknown> {
@@ -147,7 +133,7 @@ function validarDatosNuevo(valor: unknown): Record<string, unknown> {
   const semestre = valor.semestreEgreso;
   const nota = valor.notaExamen;
   const fechaExamen = exigirTexto(valor.fechaExamen, "fecha de examen", 10);
-  if (!esRutConFormato(rut)) {
+  if (!validarRut(rut)) {
     throw new HttpsError("invalid-argument", "El RUT no tiene un formato válido.");
   }
   if (
@@ -215,7 +201,7 @@ function validarCambios(
         break;
       case "rut": {
         const rut = exigirTexto(dato, campo, 20);
-        if (!esRutConFormato(rut)) {
+        if (!validarRut(rut)) {
           throw new HttpsError("invalid-argument", "El RUT no tiene un formato válido.");
         }
         cambios.rut = rut;
@@ -293,14 +279,18 @@ export const crearExpediente = onCall(async (request) => {
       transaccion.get(rutRef),
       transaccion.get(db.collection("expedientes")),
     ]);
-    const rutDuplicado = existentes.docs.some((documento) => {
-      const rutGuardado = documento.get("rutNormalizado") ?? documento.get("rut");
-      return (
-        typeof rutGuardado === "string" &&
-        normalizarRut(rutGuardado) === rutNormalizado
-      );
-    });
-    if (indice.exists || rutDuplicado) {
+    const expedientesConRut = existentes.docs.map((documento) => ({
+      id: documento.id,
+      rut: documento.get("rut"),
+      rutNormalizado: documento.get("rutNormalizado"),
+    }));
+    if (
+      esRutDuplicado(
+        rutNormalizado,
+        expedientesConRut,
+        indice.data()?.expedienteId,
+      )
+    ) {
       throw new HttpsError(
         "already-exists",
         "Ya existe un expediente con ese RUT.",
@@ -360,22 +350,27 @@ export const actualizarExpediente = onCall(async (request) => {
             : Promise.resolve(null),
           transaccion.get(db.collection("expedientes")),
         ]);
-        const rutDuplicado = existentes.docs.some((documento) => {
-          if (documento.id === id) return false;
-          const rutGuardado =
-            documento.get("rutNormalizado") ?? documento.get("rut");
-          return (
-            typeof rutGuardado === "string" &&
-            normalizarRut(rutGuardado) === rutNuevo
-          );
-        });
-        if (nuevoIndice.exists || rutDuplicado) {
+        const expedientesConRut = existentes.docs.map((documento) => ({
+          id: documento.id,
+          rut: documento.get("rut"),
+          rutNormalizado: documento.get("rutNormalizado"),
+        }));
+        if (
+          esRutDuplicado(
+            rutNuevo,
+            expedientesConRut,
+            nuevoIndice.data()?.expedienteId,
+            id,
+          )
+        ) {
           throw new HttpsError(
             "already-exists",
             "Ya existe otro expediente con ese RUT.",
           );
         }
-        transaccion.create(nuevoIndiceRef, { expedienteId: id });
+        if (!nuevoIndice.exists) {
+          transaccion.create(nuevoIndiceRef, { expedienteId: id });
+        }
         if (
           indiceAnteriorRef &&
           indiceAnterior?.data()?.expedienteId === id
@@ -411,30 +406,17 @@ export const actualizarExpediente = onCall(async (request) => {
     if (campos.length === 0) {
       throw new HttpsError("invalid-argument", "No hay cambios para guardar.");
     }
-    const valores = Object.fromEntries(
-      Object.keys(cambios)
-        .filter((campo) => campo in nuevosCambios)
-        .map((campo) => [
-          campo,
-          {
-            anterior: actual[campo] ?? null,
-            nuevo: nuevosCambios[campo] ?? null,
-          },
-        ]),
-    );
-    const camposAuditados = Object.keys(valores);
+    const auditoriaCambio = describirCambioAuditable(actual, nuevosCambios);
     transaccion.update(expedienteRef, nuevosCambios);
     transaccion.create(
       auditoriaRef,
       {
         ...crearRegistroAuditoria(
           usuario,
-          valores.colegiatura
-            ? "Cambio de colegiatura"
-            : "Actualización de expediente",
-          `Campos actualizados: ${camposAuditados.join(", ")}`,
+          auditoriaCambio.accion,
+          auditoriaCambio.detalles,
         ),
-        valores,
+        valores: auditoriaCambio.valores,
       },
     );
     return nuevosCambios;

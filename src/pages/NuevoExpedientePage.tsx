@@ -12,7 +12,13 @@ import type {
   Expediente,
   NuevoExpediente,
 } from "../types/expediente";
-import { formatearRut, limpiarRut, validarRut } from "../utils/rut";
+import { formatearRut, limpiarRut } from "../utils/rut";
+import {
+  validarCamposRegistro,
+  type CampoRegistro,
+  type CamposRegistro,
+  type ErroresRegistro,
+} from "../utils/validacionExpediente";
 import "./NuevoExpedientePage.css";
 
 interface NuevoProps {
@@ -21,23 +27,9 @@ interface NuevoProps {
   alCancelar: () => void;
 }
 
-interface Campos {
-  // Se guardan como texto mientras la persona escribe; guardar() los convierte
-  // a los números y al formato de RUT que espera el modelo Expediente.
-  nombre: string;
-  rut: string;
-  anio: string;
-  semestre: "1" | "2";
-  fechaExamen: string;
-  nota: string;
-  guia: string;
-  informante1: string;
-  informante2: string;
-  informanteAdicional: string;
-}
-
-type Campo = keyof Campos;
-type Errores = Partial<Record<Campo, string>>;
+type Campos = CamposRegistro;
+type Campo = CampoRegistro;
+type Errores = ErroresRegistro;
 
 const anioActual = new Date().getFullYear();
 
@@ -53,54 +45,6 @@ const inicial: Campos = {
   informante2: "",
   informanteAdicional: "",
 };
-
-/** Reúne los errores por campo antes de intentar guardar. */
-function validar(campos: Campos): Errores {
-  const errores: Errores = {};
-  if (!campos.nombre.trim()) errores.nombre = "Ingrese el nombre completo.";
-  if (!campos.rut.trim()) errores.rut = "Ingrese el RUT.";
-  else if (!validarRut(campos.rut))
-    errores.rut = "Revise el RUT y su dígito verificador.";
-  const anio = Number(campos.anio);
-  if (!Number.isInteger(anio) || anio < 2000 || anio >= anioActual)
-    errores.anio = `Ingrese un año entre 2000 y ${anioActual - 1}.`;
-  if (!campos.fechaExamen)
-    errores.fechaExamen = "Seleccione la fecha del examen.";
-  const nota = Number(campos.nota.replace(",", "."));
-  if (!campos.nota.trim()) errores.nota = "Ingrese la nota del examen.";
-  else if (!Number.isFinite(nota) || nota < 1 || nota > 7)
-    errores.nota = "La nota debe estar entre 1,0 y 7,0.";
-  if (!campos.guia.trim()) errores.guia = "Ingrese el profesor guía.";
-  if (!campos.informante1.trim())
-    errores.informante1 = "Ingrese el primer informante.";
-  if (!campos.informante2.trim())
-    errores.informante2 = "Ingrese el segundo informante.";
-
-  // La comparación ignora espacios, tildes y mayúsculas para detectar el mismo docente.
-  const docentes = (
-    ["guia", "informante1", "informante2", "informanteAdicional"] as const
-  )
-    .map((campo) => ({
-      campo,
-      nombre: campos[campo]
-        .trim()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/\s+/g, " "),
-    }))
-    .filter((item) => item.nombre);
-  for (const docente of docentes) {
-    if (
-      docentes.some(
-        (otro) =>
-          otro.campo !== docente.campo && otro.nombre === docente.nombre,
-      )
-    )
-      errores[docente.campo] = "Este docente ya figura en la comisión.";
-  }
-  return errores;
-}
 
 /** Formulario completo de registro. Conserva los datos si falla la validación o el guardado. */
 export function NuevoExpedientePage({
@@ -182,7 +126,7 @@ export function NuevoExpedientePage({
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (!usuario || guardando) return;
-    const encontrados = validar(campos);
+    const encontrados = validarCamposRegistro(campos);
     setErrores(encontrados);
     setErrorGeneral("");
     setIdExistente(null);
