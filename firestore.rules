@@ -10,9 +10,9 @@ service cloud.firestore {
     }
 
     match /expedientes/{id} {
-      allow get, list: if esDireccion();
-      // Todas las escrituras pasan por funciones autenticadas que registran auditoría.
-      allow create, update, delete: if false;
+      // Dirección registra cambios e historial en el mismo documento.
+      allow get, list, create, update: if esDireccion();
+      allow delete: if false;
 
       match /auditoria/{registroId} {
         allow get, list: if esDireccion();

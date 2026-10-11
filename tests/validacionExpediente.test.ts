@@ -22,12 +22,18 @@ describe("validarCamposRegistro", () => {
     expect(validarCamposRegistro(camposValidos, 2026)).toEqual({});
   });
 
-  it("rechaza el año actual y años fuera del rango permitido", () => {
+  it("acepta los extremos de 2020 a 2050 y rechaza años fuera del rango", () => {
     expect(
-      validarCamposRegistro({ ...camposValidos, anio: "2026" }, 2026),
+      validarCamposRegistro({ ...camposValidos, anio: "2020" }, 2026),
+    ).not.toHaveProperty("anio");
+    expect(
+      validarCamposRegistro({ ...camposValidos, anio: "2050" }, 2026),
+    ).not.toHaveProperty("anio");
+    expect(
+      validarCamposRegistro({ ...camposValidos, anio: "2019" }, 2026),
     ).toHaveProperty("anio");
     expect(
-      validarCamposRegistro({ ...camposValidos, anio: "1999" }, 2026),
+      validarCamposRegistro({ ...camposValidos, anio: "2051" }, 2026),
     ).toHaveProperty("anio");
   });
 
@@ -37,7 +43,11 @@ describe("validarCamposRegistro", () => {
     ).toHaveProperty("rut");
   });
 
-  it.each(["0,9", "7,1", "texto"])("rechaza nota inválida %s", (nota) => {
+  it("rechaza RUT sin el formato único con puntos y guion", () => {
+    expect(validarCamposRegistro({ ...camposValidos, rut: "12345678-5" })).toHaveProperty("rut");
+  });
+
+  it.each(["0,9", "7,1", "6.1", "texto"])("rechaza nota inválida %s", (nota) => {
     expect(
       validarCamposRegistro({ ...camposValidos, nota }, 2026),
     ).toHaveProperty("nota");

@@ -15,8 +15,17 @@ export function digitoVerificador(cuerpo: string): string {
   return resto === 11 ? "0" : resto === 10 ? "K" : String(resto);
 }
 
-/** Acepta RUT con o sin puntos o guion, si el dígito verificador coincide. */
+/** Mantiene un único formato visual mientras se escribe el RUT. */
+export function formatearEntradaRut(valor: string): string {
+  const limpio = valor.toUpperCase().replace(/[^\dK]/g, "").slice(0, 9);
+  const cuerpo = limpio.length >= 8 ? limpio.slice(0, -1) : limpio;
+  const agrupado = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return limpio.length >= 8 ? `${agrupado}-${limpio.slice(-1)}` : agrupado;
+}
+
+/** Exige el formato con puntos y guion y verifica el dígito final. */
 export function validarRut(valor: string): boolean {
+  if (!/^\d{1,2}\.\d{3}\.\d{3}-[\dK]$/.test(valor)) return false;
   const limpio = limpiarRut(valor);
   if (!/^\d{7,8}[\dK]$/.test(limpio)) return false;
   const cuerpo = limpio.slice(0, -1);
@@ -25,6 +34,5 @@ export function validarRut(valor: string): boolean {
 
 /** Normaliza el dato antes de compararlo o guardarlo. */
 export function formatearRut(valor: string): string {
-  const limpio = limpiarRut(valor);
-  return `${limpio.slice(0, -1)}-${limpio.slice(-1)}`;
+  return formatearEntradaRut(valor);
 }

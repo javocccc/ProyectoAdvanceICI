@@ -10,6 +10,7 @@ import { ExpedientesPage } from "./pages/ExpedientesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NuevoExpedientePage } from "./pages/NuevoExpedientePage";
 import { PanelPage } from "./pages/PanelPage";
+import logoUcen from "../logoucen.jpg";
 
 // La navegación es local a esta pestaña: cambiar de vista no cambia la URL.
 type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle";
@@ -109,9 +110,7 @@ export default function App() {
         aria-label="Navegación principal"
       >
         <div className="sidebar-brand">
-          <span className="brand-mark">
-            A<span>.</span>
-          </span>
+          <img className="brand-logo" src={logoUcen} alt="Universidad Central de Chile" />
           <span>
             ADVANCE <strong>ICI</strong>
             <small>Gestión de titulación</small>

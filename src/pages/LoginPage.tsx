@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "../components/Icon";
+import logoUcen from "../../logoucen.jpg";
 import { useAuth } from "../context/AuthContext";
 import { firebaseConfigurado } from "../services/firebase";
 
@@ -41,24 +42,20 @@ export function LoginPage() {
     <main className="login-layout">
       <section className="login-story" aria-label="Presentación del sistema">
         <div className="login-brand">
-          <span className="brand-mark">
-            A<span>.</span>
-          </span>
+          <img className="brand-logo" src={logoUcen} alt="Universidad Central de Chile" />
           <span>
             ADVANCE <strong>ICI</strong>
           </span>
         </div>
         <div className="login-story-copy">
           <span className="story-rule" />
-          <h1>Un lugar para seguir cada expediente hasta el final.</h1>
+          <h1>Gestión de titulación Ingeniería Civil Industrial.</h1>
           <p>
-            Gestión de titulación para la Dirección de Ingeniería Civil
-            Industrial.
+            Sistema de apoyo a la gestión de expedientes de titulación para la carrera de Ingeniería Civil Industrial de la Universidad Central de Chile.
           </p>
         </div>
         <div className="story-footer">
           <span>UNIVERSIDAD CENTRAL DE CHILE</span>
-          <span>PROYECTO ACADÉMICO · 2026</span>
         </div>
         <div className="story-lines" aria-hidden="true">
           <i />
@@ -70,9 +67,7 @@ export function LoginPage() {
       <section className="login-panel" aria-labelledby="login-title">
         <div className="login-form-wrap">
           <div className="login-mobile-brand">
-            <span className="brand-mark">
-              A<span>.</span>
-            </span>{" "}
+            <img className="brand-logo" src={logoUcen} alt="Universidad Central de Chile" />{" "}
             ADVANCE ICI
           </div>
           <div className="login-panel-heading">
@@ -138,8 +133,7 @@ export function LoginPage() {
             </button>
           </form>
           <p className="login-help">
-            Acceso reservado para Dirección ICI. Si necesita ayuda, contacte al
-            equipo del proyecto.
+            Acceso reservado para Dirección ICI.
           </p>
         </div>
       </section>

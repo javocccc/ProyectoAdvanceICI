@@ -116,8 +116,7 @@ export function PanelPage({
         </div>
       </section>
 
-      <div className="content-columns">
-        <div className="main-column">
+      <div className="panel-sections">
           <section className="search-section" aria-labelledby="search-title">
             <div className="section-heading">
               <div>
@@ -167,41 +166,6 @@ export function PanelPage({
               <p>Cargando expedientes recientes…</p>
             )}
           </section>
-        </div>
-        <aside className="side-column" aria-labelledby="attention-title">
-          <div className="attention-heading">
-            <span className="attention-icon">
-              <Icon name="clock" size={21} />
-            </span>
-            <h2 id="attention-title">Requieren atención</h2>
-          </div>
-          <p className="attention-copy">
-            Revise estos registros para mantener el proceso al día.
-          </p>
-          <div className="attention-list">
-            <div className="attention-item">
-              <span className="attention-count">
-                {resumen ? String(pendientesPago).padStart(2, "0") : "—"}
-              </span>
-              <div>
-                <strong>Colegiatura por revisar</strong>
-                <p>Alumnos sin confirmar o con pago pendiente.</p>
-              </div>
-            </div>
-            <div className="attention-item">
-              <span className="attention-count">
-                {resumen ? String(sinActa).padStart(2, "0") : "—"}
-              </span>
-              <div>
-                <strong>Actas por adjuntar</strong>
-                <p>Expedientes sin respaldo documental.</p>
-              </div>
-            </div>
-          </div>
-          <button type="button" className="attention-link" onClick={alVerTodos}>
-            Ir a expedientes <Icon name="chevron" size={18} />
-          </button>
-        </aside>
       </div>
     </>
   );

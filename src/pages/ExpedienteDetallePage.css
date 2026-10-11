@@ -67,6 +67,17 @@
   display: flex;
   gap: 18px;
   margin-top: 13px;
+  flex-wrap: wrap;
+}
+.ficha-grid .acta-delete {
+  color: #a63427;
+}
+.ficha-grid .button-danger {
+  background: #a63427;
+  color: white;
+}
+.ficha-grid .button-danger:hover {
+  background: #842719;
 }
 .ficha-grid .inline-action {
   border: 0;

@@ -12,7 +12,7 @@ import type {
   Expediente,
   NuevoExpediente,
 } from "../types/expediente";
-import { formatearRut } from "../utils/rut";
+import { formatearEntradaRut, formatearRut } from "../utils/rut";
 import {
   validarCamposRegistro,
   type CampoRegistro,
@@ -32,11 +32,12 @@ type Campo = CampoRegistro;
 type Errores = ErroresRegistro;
 
 const anioActual = new Date().getFullYear();
+const aniosEgreso = Array.from({ length: 31 }, (_, indice) => 2020 + indice);
 
 const inicial: Campos = {
   nombre: "",
   rut: "",
-  anio: String(anioActual - 1),
+  anio: String(Math.min(2050, Math.max(2020, anioActual - 1))),
   semestre: "1",
   fechaExamen: "",
   nota: "",
@@ -59,7 +60,7 @@ export function NuevoExpedientePage({
     expediente
       ? {
           nombre: expediente.nombre,
-          rut: expediente.rut,
+          rut: formatearEntradaRut(expediente.rut),
           anio: String(expediente.anioEgreso),
           semestre: String(expediente.semestreEgreso) as "1" | "2",
           fechaExamen: expediente.fechaExamen,
@@ -110,7 +111,19 @@ export function NuevoExpedientePage({
           max={opciones.max}
           placeholder={opciones.placeholder}
           value={campos[campo]}
-          onChange={(evento) => cambiar(campo, evento.target.value)}
+          onChange={(evento) => {
+            const valor = evento.target.value;
+            cambiar(
+              campo,
+              campo === "rut"
+                ? formatearEntradaRut(valor)
+                : campo === "nota" && /^[1-7]?(?:,[0-9]?)?$/.test(valor)
+                  ? valor
+                  : campo === "nota"
+                    ? campos.nota
+                    : valor,
+            );
+          }}
           aria-invalid={Boolean(errores[campo])}
           aria-describedby={errores[campo] ? `error-${campo}` : undefined}
         />
@@ -215,12 +228,22 @@ export function NuevoExpedientePage({
             placeholder: "Nombre y apellidos",
           })}
           {campoTexto("rut", "RUT *", { placeholder: "12.345.678-5" })}
-          {campoTexto("anio", "Año de egreso *", {
-            type: "number",
-            inputMode: "numeric",
-            min: "2000",
-            max: String(anioActual - 1),
-          })}
+          <label htmlFor="registro-anio">
+            Año de egreso *
+            <select
+              id="registro-anio"
+              name="anio"
+              value={campos.anio}
+              onChange={(e) => cambiar("anio", e.target.value)}
+              aria-invalid={Boolean(errores.anio)}
+              aria-describedby={errores.anio ? "error-anio" : undefined}
+            >
+              {aniosEgreso.map((anio) => (
+                <option key={anio} value={anio}>{anio}</option>
+              ))}
+            </select>
+            {errores.anio && <span className="field-error" id="error-anio">{errores.anio}</span>}
+          </label>
           <label htmlFor="registro-semestre">
             Semestre de egreso *
             <select

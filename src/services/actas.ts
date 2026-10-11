@@ -1,19 +1,21 @@
-import {
-  deleteObject,
-  getBlob,
-  getDownloadURL,
-  ref,
-  uploadBytesResumable,
-} from "firebase/storage";
+import { Upload } from "tus-js-client";
+import { deleteObject, getBlob, getDownloadURL, ref } from "firebase/storage";
 import type { Acta } from "../types/expediente";
-import { storage } from "./firebase";
+import { auth, storage } from "./firebase";
+import {
+  bucketActas,
+  endpointSubida,
+  exigirSupabase,
+  tokenFirebaseParaActas,
+} from "./supabase";
 
 const MAX_MB = 10;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
+const PREFIJO_SUPABASE = "supabase/";
 
 // La ficha llama a estas funciones; el servicio no decide cuándo mostrar
 // confirmaciones ni guarda por sí solo la ruta del acta en Firestore.
-/** Comprueba extensión, tipo, tamaño y cabecera PDF antes de enviarlo. Storage repite las comprobaciones de tipo y tamaño. */
+/** Comprueba extensión, tipo, tamaño y cabecera PDF antes de enviarlo. */
 export async function validarActa(archivo: File): Promise<string | null> {
   if (!/\.pdf$/i.test(archivo.name) || archivo.type !== "application/pdf")
     return "Seleccione un archivo PDF.";
@@ -32,7 +34,7 @@ export async function subirActa(
   alProgresar: (porcentaje: number) => void,
 ): Promise<Acta> {
   // En demostración solo se guarda el nombre; el PDF no va a un servidor.
-  if (!storage) {
+  if (!auth) {
     alProgresar(100);
     return {
       nombre: archivo.name,
@@ -40,43 +42,80 @@ export async function subirActa(
       fechaCarga: new Date().toISOString(),
     };
   }
-  const ruta = `actas/${expedienteId}/${crypto.randomUUID()}.pdf`;
-  const tarea = uploadBytesResumable(ref(storage, ruta), archivo, {
-    contentType: "application/pdf",
-  });
-  // Firebase informa bytes enviados. Convertimos ese dato a un porcentaje
-  // para la barra de progreso que muestra ExpedienteDetallePage.
+  exigirSupabase();
+  const token = await tokenFirebaseParaActas();
+  const objeto = `${expedienteId}/${crypto.randomUUID()}.pdf`;
   await new Promise<void>((resolve, reject) => {
-    tarea.on(
-      "state_changed",
-      (estado) => {
-        alProgresar(
-          Math.round((estado.bytesTransferred / estado.totalBytes) * 100),
-        );
+    const subida = new Upload(archivo, {
+      endpoint: endpointSubida(),
+      retryDelays: [0, 3000, 5000, 10000],
+      headers: { authorization: `Bearer ${token}` },
+      metadata: {
+        bucketName: bucketActas,
+        objectName: objeto,
+        contentType: "application/pdf",
       },
-      reject,
-      resolve,
-    );
+      chunkSize: 6 * 1024 * 1024,
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      onProgress: (enviados, total) => {
+        if (total > 0) alProgresar(Math.min(99, Math.round((enviados / total) * 100)));
+      },
+      onSuccess: () => {
+        alProgresar(100);
+        resolve();
+      },
+      onError: reject,
+    });
+    subida.start();
   });
-  return { nombre: archivo.name, ruta, fechaCarga: new Date().toISOString() };
+  return {
+    nombre: archivo.name,
+    ruta: `${PREFIJO_SUPABASE}${objeto}`,
+    fechaCarga: new Date().toISOString(),
+  };
 }
 
-/** Obtiene una URL de descarga de Storage para abrir el PDF en otra pestaña. */
+function rutaSupabase(acta: Acta): string {
+  return acta.ruta.slice(PREFIJO_SUPABASE.length);
+}
+
+/** Obtiene una URL temporal de Supabase o de un acta antigua de Firebase. */
 export async function urlActa(acta: Acta): Promise<string> {
-  if (!storage)
-    throw new Error("El acta de demostración no está respaldada en Firebase.");
-  return getDownloadURL(ref(storage, acta.ruta));
+  if (acta.ruta.startsWith(PREFIJO_SUPABASE)) {
+    const { data, error } = await exigirSupabase()
+      .storage.from(bucketActas)
+      .createSignedUrl(rutaSupabase(acta), 60);
+    if (error) throw error;
+    return data.signedUrl;
+  }
+  if (storage && acta.ruta.startsWith("actas/"))
+    return getDownloadURL(ref(storage, acta.ruta));
+  throw new Error("El acta de demostración no tiene un archivo persistente.");
 }
 
 /** Obtiene los bytes del PDF; la ficha crea un enlace con el nombre original. */
 export async function blobActa(acta: Acta): Promise<Blob> {
-  if (!storage)
-    throw new Error("El acta de demostración no está respaldada en Firebase.");
-  return getBlob(ref(storage, acta.ruta));
+  if (acta.ruta.startsWith(PREFIJO_SUPABASE)) {
+    const { data, error } = await exigirSupabase()
+      .storage.from(bucketActas)
+      .download(rutaSupabase(acta));
+    if (error) throw error;
+    return data;
+  }
+  if (storage && acta.ruta.startsWith("actas/"))
+    return getBlob(ref(storage, acta.ruta));
+  throw new Error("El acta de demostración no tiene un archivo persistente.");
 }
 
 /** Borra una copia de Storage al reemplazarla o al fallar el guardado de su ruta. */
 export async function borrarActa(acta: Acta): Promise<void> {
-  if (storage && acta.ruta.startsWith("actas/"))
+  if (acta.ruta.startsWith(PREFIJO_SUPABASE)) {
+    const { error } = await exigirSupabase()
+      .storage.from(bucketActas)
+      .remove([rutaSupabase(acta)]);
+    if (error) throw error;
+  } else if (storage && acta.ruta.startsWith("actas/")) {
     await deleteObject(ref(storage, acta.ruta));
+  }
 }

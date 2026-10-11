@@ -3,11 +3,13 @@ import { ExpedientesTable } from "../components/ExpedientesTable";
 import { Icon } from "../components/Icon";
 import {
   obtenerPaginaExpedientes,
+  TAMANO_PAGINA,
   type CursorExpedientes,
   type FiltroExpedientes,
 } from "../services/expedientes";
 import { mensajeErrorAlmacenamientoDemo } from "../services/almacenamientoDemo";
 import type { Expediente } from "../types/expediente";
+import { mensajeErrorFirebase } from "../utils/errorFirebase";
 
 interface ExpedientesProps {
   busquedaInicial: string;
@@ -58,7 +60,7 @@ export function ExpedientesPage({
           if (vigente) {
             setError(
               mensajeErrorAlmacenamientoDemo(problema) ??
-                "No fue posible cargar los expedientes.",
+                mensajeErrorFirebase(problema, "listado"),
             );
           }
         })
@@ -145,7 +147,7 @@ export function ExpedientesPage({
               alAbrir={alAbrir}
               alEditar={alEditar}
             />
-            <nav className="pagination" aria-label="Páginas de expedientes">
+            {total > TAMANO_PAGINA && <nav className="pagination" aria-label="Páginas de expedientes">
               <button
                 className="button button-secondary"
                 type="button"
@@ -163,7 +165,7 @@ export function ExpedientesPage({
               >
                 Siguiente
               </button>
-            </nav>
+            </nav>}
           </>
         )}
       </section>

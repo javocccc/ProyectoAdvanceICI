@@ -1,7 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 // import.meta.env es la forma en que Vite entrega al código del navegador las
@@ -35,5 +34,7 @@ const app = firebaseConfigurado
 // Los demás módulos comprueban si cada servicio es null: null significa demo.
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
-export const functions = app ? getFunctions(app, "us-central1") : null;
 export const storage = app ? getStorage(app) : null;
+// El valor predeterminado reintenta hasta diez minutos y deja la barra en 0 %.
+// Un fallo de configuración o red debe volver pronto con un error visible.
+if (storage) storage.maxUploadRetryTime = 45_000;

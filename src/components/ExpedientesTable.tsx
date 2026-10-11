@@ -41,7 +41,22 @@ export function ExpedientesTable({
         <tbody>
           {/* map crea una fila por expediente; key permite a React identificarla. */}
           {expedientes.map((item) => (
-            <tr key={item.id}>
+            <tr
+              key={item.id}
+              className="expediente-row"
+              tabIndex={0}
+              aria-label={`Abrir expediente de ${item.nombre}`}
+              onClick={(evento) => {
+                if (!(evento.target as HTMLElement).closest("button")) alAbrir(item.id);
+              }}
+              onKeyDown={(evento) => {
+                if (evento.target !== evento.currentTarget) return;
+                if (evento.key === "Enter" || evento.key === " ") {
+                  evento.preventDefault();
+                  alAbrir(item.id);
+                }
+              }}
+            >
               <td>
                 <button
                   type="button"

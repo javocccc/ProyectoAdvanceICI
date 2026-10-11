@@ -7,28 +7,25 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
+  setDoc,
   startAfter,
-  where,
 } from "firebase/firestore";
-import type {
-  DocumentData,
-  QueryConstraint,
-  QueryDocumentSnapshot,
-} from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import type {
   Expediente,
   NuevoExpediente,
   RegistroAuditoria,
 } from "../types/expediente";
 import { limpiarRut } from "../utils/rut";
-import { db, functions } from "./firebase";
+import { db } from "./firebase";
+import { prepararActualizacion } from "../utils/cambiosExpediente";
 import {
   guardarExpedientesDemo,
   leerExpedientesDemo,
 } from "./almacenamientoDemo";
 
-const TAMANO_PAGINA = 20;
+export const TAMANO_PAGINA = 20;
 
 export type FiltroExpedientes = "todos" | Expediente["colegiatura"];
 export type CursorExpedientes =
@@ -58,13 +55,14 @@ function normalizarBusqueda(texto: string): string {
     .replace(/\s+/g, " ");
 }
 
-function filtrarDemo(
+function filtrarExpedientes(
+  expedientes: Expediente[],
   busqueda: string,
   filtro: FiltroExpedientes,
 ): Expediente[] {
   const termino = normalizarBusqueda(busqueda);
   const terminoRut = limpiarRut(busqueda);
-  return leerExpedientesDemo().filter((expediente) => {
+  return expedientes.filter((expediente) => {
     const nombre = normalizarBusqueda(expediente.nombre);
     const coincideTexto =
       !termino ||
@@ -80,7 +78,11 @@ function filtrarDemo(
   });
 }
 
-/** Consulta una página; Firebase aplica búsqueda, filtro y límite en el servidor. */
+function filtrarDemo(busqueda: string, filtro: FiltroExpedientes): Expediente[] {
+  return filtrarExpedientes(leerExpedientesDemo(), busqueda, filtro);
+}
+
+/** Consulta una página; para filtros y búsqueda incluye fichas antiguas sin índices de búsqueda. */
 export async function obtenerPaginaExpedientes(
   busqueda: string,
   filtro: FiltroExpedientes,
@@ -97,26 +99,33 @@ export async function obtenerPaginaExpedientes(
     return { expedientes, total: coincidentes.length, siguienteCursor };
   }
 
-  const restricciones: QueryConstraint[] = [];
-  if (filtro !== "todos") restricciones.push(where("colegiatura", "==", filtro));
   const termino = normalizarBusqueda(busqueda);
-  if (termino) {
-    const rut = limpiarRut(busqueda);
-    const tokens = [...new Set([termino, rut].filter((token) => token.length >= 2))];
-    if (tokens.length === 0) {
-      return { expedientes: [], total: 0, siguienteCursor: null };
-    }
-    restricciones.push(where("busquedaTokens", "array-contains-any", tokens));
+  if (termino || filtro !== "todos") {
+    // La búsqueda también debe encontrar fichas anteriores a busquedaTokens y
+    // funcionar aunque los índices compuestos aún no estén publicados.
+    const instantanea = await getDocs(collection(db, "expedientes"));
+    const coincidentes = filtrarExpedientes(
+      instantanea.docs.map((item) => item.data() as Expediente),
+      busqueda,
+      filtro,
+    ).sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion));
+    const inicio = typeof cursor === "number" ? cursor : 0;
+    const expedientes = coincidentes.slice(inicio, inicio + TAMANO_PAGINA);
+    return {
+      expedientes,
+      total: coincidentes.length,
+      siguienteCursor: inicio + expedientes.length < coincidentes.length
+        ? inicio + expedientes.length
+        : null,
+    };
   }
 
   const coleccion = collection(db, "expedientes");
-  const base = query(coleccion, ...restricciones);
   const [conteo, pagina] = await Promise.all([
-    getCountFromServer(base),
+    getCountFromServer(coleccion),
     getDocs(
       query(
         coleccion,
-        ...restricciones,
         orderBy("fechaCreacion", "desc"),
         ...(cursor && typeof cursor !== "number" ? [startAfter(cursor)] : []),
         limit(TAMANO_PAGINA + 1),
@@ -144,7 +153,7 @@ export async function obtenerExpediente(
   return respuesta.exists() ? (respuesta.data() as Expediente) : null;
 }
 
-/** Busca por índice de RUT para resolver duplicados sin escanear la colección. */
+/** Busca por RUT en fichas nuevas y antiguas sin depender de índices. */
 export async function buscarExpedientePorRut(
   rut: string,
 ): Promise<Expediente | null> {
@@ -156,19 +165,13 @@ export async function buscarExpedientePorRut(
       null
     );
   }
-  const coincidencias = await getDocs(
-    query(
-      collection(db, "expedientes"),
-      where("rutNormalizado", "==", limpiarRut(rut)),
-      limit(1),
-    ),
-  );
-  return coincidencias.empty
-    ? null
-    : (coincidencias.docs[0].data() as Expediente);
+  const existentes = await getDocs(collection(db, "expedientes"));
+  return existentes.docs
+    .map((item) => item.data() as Expediente)
+    .find((item) => limpiarRut(item.rut) === limpiarRut(rut)) ?? null;
 }
 
-/** Obtiene las cifras del panel con agregaciones, sin leer todos los documentos. */
+/** Obtiene cifras correctas incluso para fichas antiguas sin actaPendiente. */
 export async function obtenerResumenExpedientes(): Promise<ResumenExpedientes> {
   if (!db) {
     const expedientes = leerExpedientesDemo();
@@ -185,32 +188,21 @@ export async function obtenerResumenExpedientes(): Promise<ResumenExpedientes> {
         .slice(0, 5),
     };
   }
-  const expedientes = collection(db, "expedientes");
-  const [total, pendientesColegiatura, pendientesActa, recientes] =
-    await Promise.all([
-      getCountFromServer(expedientes),
-      getCountFromServer(
-        query(
-          expedientes,
-          where("colegiatura", "in", ["no-al-dia", "sin-informar"]),
-        ),
-      ),
-      getCountFromServer(
-        query(expedientes, where("actaPendiente", "==", true)),
-      ),
-      getDocs(
-        query(expedientes, orderBy("fechaCreacion", "desc"), limit(5)),
-      ),
-    ]);
+  const respuesta = await getDocs(collection(db, "expedientes"));
+  const expedientes = respuesta.docs.map((item) => item.data() as Expediente);
   return {
-    total: total.data().count,
-    pendientesColegiatura: pendientesColegiatura.data().count,
-    pendientesActa: pendientesActa.data().count,
-    recientes: recientes.docs.map((item) => item.data() as Expediente),
+    total: expedientes.length,
+    pendientesColegiatura: expedientes.filter((item) =>
+      item.colegiatura === "no-al-dia" || item.colegiatura === "sin-informar"
+    ).length,
+    pendientesActa: expedientes.filter((item) => !item.acta).length,
+    recientes: expedientes
+      .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))
+      .slice(0, 5),
   };
 }
 
-/** Lee las últimas acciones que Firebase registra de forma inmutable. */
+/** Lee el historial guardado en el mismo expediente. */
 export async function listarAuditoriaExpediente(
   id: string,
 ): Promise<RegistroAuditoria[]> {
@@ -220,17 +212,10 @@ export async function listarAuditoriaExpediente(
         ?.historialAuditoria ?? []
     ).slice(-50).reverse();
   }
-  const registros = await getDocs(
-    query(
-      collection(db, "expedientes", id, "auditoria"),
-      orderBy("fecha", "desc"),
-      limit(50),
-    ),
-  );
-  return registros.docs.map(
-    (registro) =>
-      ({ id: registro.id, ...registro.data() }) as RegistroAuditoria,
-  );
+  const expediente = await getDoc(doc(db, "expedientes", id));
+  return ((expediente.data() as Expediente | undefined)?.historialAuditoria ?? [])
+    .slice(-50)
+    .reverse();
 }
 
 /** Crea una ficha y rechaza un RUT ya presente tras quitar su puntuación. */
@@ -244,15 +229,21 @@ export async function crearExpediente(
     fechaCreacion: new Date().toISOString(),
     creadoPor: usuario,
     historialColegiatura: [],
+    historialAuditoria: [{
+      id: crypto.randomUUID(),
+      fecha: new Date().toISOString(),
+      usuario,
+      accion: "Creación de expediente",
+      detalles: "Expediente creado.",
+    }],
   };
   if (db) {
-    if (!functions) throw new Error("Las funciones de Firebase no están disponibles.");
-    const crear = httpsCallable<{ expediente: NuevoExpediente }, Expediente>(
-      functions,
-      "crearExpediente",
-    );
-    const respuesta = await crear({ expediente: nuevo });
-    return respuesta.data;
+    const existentes = await getDocs(collection(db, "expedientes"));
+    if (existentes.docs.some((item) =>
+      limpiarRut((item.data() as Expediente).rut) === limpiarRut(nuevo.rut)
+    )) throw new Error("Ya existe un expediente con ese RUT.");
+    await setDoc(doc(db, "expedientes", expediente.id), expediente);
+    return expediente;
   }
   const existente = leerExpedientesDemo();
   if (
@@ -264,7 +255,7 @@ export async function crearExpediente(
   return expediente;
 }
 
-/** Actualiza una ficha; Firebase registra la auditoría desde una función confiable. */
+/** Actualiza una ficha y su historial en una transacción de Firestore. */
 export async function actualizarExpediente(
   id: string,
   cambios: Partial<Expediente>,
@@ -272,23 +263,22 @@ export async function actualizarExpediente(
   observacionColegiatura?: string,
 ): Promise<Partial<Expediente>> {
   if (db) {
-    if (!functions) throw new Error("Las funciones de Firebase no están disponibles.");
-    const actualizar = httpsCallable<
-      {
-        id: string;
-        cambios: Partial<Expediente>;
-        observacionColegiatura?: string;
-      },
-      Partial<Expediente>
-    >(functions, "actualizarExpediente");
-    const respuesta = await actualizar({
-      id,
-      cambios,
-      ...(observacionColegiatura
-        ? { observacionColegiatura }
-        : {}),
+    if (cambios.rut) {
+      const existentes = await getDocs(collection(db, "expedientes"));
+      if (existentes.docs.some((item) =>
+        item.id !== id &&
+        limpiarRut((item.data() as Expediente).rut) === limpiarRut(cambios.rut!)
+      )) throw new Error("Ya existe otro expediente con ese RUT.");
+    }
+    const referencia = doc(db, "expedientes", id);
+    return runTransaction(db, async (transaccion) => {
+      const instantanea = await transaccion.get(referencia);
+      if (!instantanea.exists()) throw new Error("No se encontró el expediente que desea editar.");
+      const actual = instantanea.data() as Expediente;
+      const preparados = prepararActualizacion(actual, cambios, usuarioEmail, observacionColegiatura);
+      transaccion.update(referencia, preparados);
+      return preparados;
     });
-    return respuesta.data;
   }
 
   const existentes = leerExpedientesDemo();
@@ -304,45 +294,12 @@ export async function actualizarExpediente(
   ) {
     throw new Error("Ya existe otro expediente con ese RUT.");
   }
-  const cambiosLocales = { ...cambios };
-  if (
-    cambiosLocales.colegiatura &&
-    cambiosLocales.colegiatura !== actual.colegiatura
-  ) {
-    const fecha = new Date().toISOString();
-    cambiosLocales.fechaColegiatura = fecha;
-    cambiosLocales.historialColegiatura = [
-      ...actual.historialColegiatura,
-      {
-        estadoAnterior: actual.colegiatura,
-        estadoNuevo: cambiosLocales.colegiatura,
-        fecha,
-        usuario: usuarioEmail,
-        ...(observacionColegiatura?.trim()
-          ? { observacion: observacionColegiatura.trim() }
-          : {}),
-      },
-    ];
-  }
-  const camposActualizados = Object.keys(cambiosLocales);
-  const nuevoRegistro: RegistroAuditoria = {
-    id: crypto.randomUUID(),
-    fecha: new Date().toISOString(),
-    usuario: usuarioEmail,
-    accion: "Actualización de expediente",
-    detalles: camposActualizados.length
-      ? `Campos actualizados: ${camposActualizados.join(", ")}`
-      : "Sin cambios detectados",
-  };
+  const cambiosLocales = prepararActualizacion(actual, cambios, usuarioEmail, observacionColegiatura);
   const actualizados = existentes.map((item) =>
     item.id === id
       ? {
           ...item,
           ...cambiosLocales,
-          historialAuditoria: [
-            ...(item.historialAuditoria ?? []),
-            nuevoRegistro,
-          ],
         }
       : item,
   );

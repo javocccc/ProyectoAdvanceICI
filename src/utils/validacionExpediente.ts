@@ -19,7 +19,7 @@ export type ErroresRegistro = Partial<Record<CampoRegistro, string>>;
 /** Valida los datos ingresados antes de crear o actualizar un expediente. */
 export function validarCamposRegistro(
   campos: CamposRegistro,
-  anioActual = new Date().getFullYear(),
+  _anioActual = new Date().getFullYear(),
 ): ErroresRegistro {
   const errores: ErroresRegistro = {};
   if (!campos.nombre.trim()) errores.nombre = "Ingrese el nombre completo.";
@@ -27,14 +27,14 @@ export function validarCamposRegistro(
   else if (!validarRut(campos.rut))
     errores.rut = "Revise el RUT y su dígito verificador.";
   const anio = Number(campos.anio);
-  if (!Number.isInteger(anio) || anio < 2000 || anio >= anioActual)
-    errores.anio = `Ingrese un año entre 2000 y ${anioActual - 1}.`;
+  if (!Number.isInteger(anio) || anio < 2020 || anio > 2050)
+    errores.anio = "Seleccione un año entre 2020 y 2050.";
   if (!campos.fechaExamen)
     errores.fechaExamen = "Seleccione la fecha del examen.";
   const nota = Number(campos.nota.replace(",", "."));
   if (!campos.nota.trim()) errores.nota = "Ingrese la nota del examen.";
-  else if (!Number.isFinite(nota) || nota < 1 || nota > 7)
-    errores.nota = "La nota debe estar entre 1,0 y 7,0.";
+  else if (!/^[1-7](?:,[0-9])?$/.test(campos.nota.trim()) || !Number.isFinite(nota) || nota < 1 || nota > 7)
+    errores.nota = "Use una nota entre 1,0 y 7,0 con coma decimal.";
   if (!campos.guia.trim()) errores.guia = "Ingrese el profesor guía.";
   if (!campos.informante1.trim())
     errores.informante1 = "Ingrese el primer informante.";

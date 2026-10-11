@@ -6,11 +6,10 @@ gestionar el estado de colegiatura y respaldar actas de examen.
 ## Requisitos
 
 - Node.js 22 o superior y npm.
-- Para configurar Firebase: un proyecto Firebase con Authentication,
-  Cloud Firestore y Cloud Storage habilitados.
-- Para desplegar o migrar índices: Firebase CLI. Para ejecutar la migración
-  inicial desde una máquina local, también se necesita Google Cloud CLI y una
-  cuenta con permisos de lectura y escritura en Firestore.
+- Para login y expedientes: Firebase Authentication y Cloud Firestore.
+- Para PDFs: un proyecto Supabase Storage. Firebase sigue gestionando el login
+  y Firestore los expedientes; no hace falta Firebase Storage ni Blaze.
+- Para publicar reglas de Firestore: Firebase CLI.
 
 ## Instalación y desarrollo local
 
@@ -37,7 +36,7 @@ reales ni como mecanismo de autenticación de producción.
 
 1. Crea o selecciona un proyecto Firebase.
 2. En Authentication, habilita el proveedor **Correo electrónico/Contraseña**.
-3. Crea la base de datos de Firestore y el bucket de Cloud Storage.
+3. Crea la base de datos de Firestore.
 4. Registra una aplicación web en la configuración del proyecto Firebase.
 5. Copia `.env.example` a `.env` y completa los valores de la aplicación web:
 
@@ -50,10 +49,12 @@ reales ni como mecanismo de autenticación de producción.
    VITE_FIREBASE_APP_ID=
    ```
 
+   `VITE_FIREBASE_STORAGE_BUCKET` solo se usa para leer actas antiguas que ya
+   estuvieran en Firebase Storage; puede quedar vacío si no existen.
+
    No agregues claves privadas de cuentas de servicio al `.env` del frontend.
    Los valores `VITE_*` se incluyen en el código público del navegador; la
-   protección de los datos depende de Authentication, las reglas y las
-   funciones del servidor.
+   protección de los datos depende de Authentication y las reglas de Firestore.
 
 6. En Firebase Authentication, crea la cuenta de cada persona autorizada.
    Obtén el UID de la cuenta y crea manualmente en Firestore el documento
@@ -65,86 +66,97 @@ reales ni como mecanismo de autenticación de producción.
    }
    ```
 
-   Las reglas de Firestore y Storage exigen que la cuenta autenticada tenga ese
-   rol. Las reglas no permiten modificar los documentos `usuarios` desde la
-   aplicación.
+   Las reglas de Firestore exigen ese rol para leer y escribir expedientes.
+   Supabase usa una claim de Firebase sincronizada desde ese documento. La
+   aplicación no modifica documentos `usuarios`.
 
-7. Desde la raíz instala las dependencias de las funciones:
+7. Instala dependencias con `npm install`. El directorio `functions/` conserva
+   una implementación anterior; la aplicación actual no lo llama ni lo despliega.
+
+## Configuración de Supabase para actas
+
+1. Crea un proyecto Supabase. En **Authentication → Third-Party Auth**, agrega
+   **Firebase Auth** con el `VITE_FIREBASE_PROJECT_ID` del proyecto existente.
+   El login sigue ocurriendo únicamente en Firebase.
+2. En el SQL Editor de Supabase, abre `supabase/actas.sql` y ejecútalo. Ya
+   incluye el Firebase Project ID `advanceici`. Crea el
+   bucket privado `actas` y políticas para cuentas de Dirección. No hagas
+   público el bucket.
+3. En `.env` completa la URL del proyecto y su **publishable key**:
+
+   ```dotenv
+   VITE_SUPABASE_URL=https://<PROJECT_REF>.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
+
+   Si usas `.env.development`, completa las mismas variables allí para la
+   vista local. Reinicia `npm run dev` tras modificar cualquiera de estos
+   archivos. Nunca pongas la `service_role` o una secret key en `VITE_*`.
+   Para GitHub Pages, configura `VITE_SUPABASE_URL` y
+   `VITE_SUPABASE_PUBLISHABLE_KEY` como variables del repositorio en
+   **Settings → Secrets and variables → Actions → Variables**. El flujo
+   `.github/workflows/deploy.yml` las incorpora a la compilación.
+4. Supabase requiere la claim Firebase `role: authenticated`. Las políticas
+   también requieren `direccion: true`. Para asignarlas a cuentas cuyo
+   documento `usuarios/<uid>` tenga `rol: direccion`, ejecuta desde
+   `functions/` el script con credenciales de administrador de Firebase:
 
    ```powershell
+   $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\ruta\privada\cuenta-servicio.json"
    npm install
-   npm install --prefix functions
+   node scripts/syncSupabaseClaims.mjs
+   node scripts/syncSupabaseClaims.mjs --apply
    ```
 
-   La configuración del proyecto está en `firebase.json`; el código de las
-   funciones está en `functions/`.
+   El primer comando del script solo muestra los cambios. `--apply` los
+   aplica; no reemplaza otras claims de la cuenta. Repite el proceso al dar
+   de alta o revocar el rol de Dirección. Las credenciales de administrador
+   se configuran fuera del repositorio mediante Application Default
+   Credentials. Descarga la cuenta de servicio solo desde la configuración
+   de Firebase si tienes acceso de administrador; guarda ese JSON fuera del
+   proyecto y no lo compartas ni lo subas a GitHub. Después de aplicar las
+   claims, vuelve a iniciar sesión para obtener un token nuevo.
 
-## Preparar y desplegar una base existente
+   Para comprobar la integración sin tocar expedientes reales, con esa misma
+   variable de credenciales ejecuta `node scripts/verifySupabaseStorage.mjs`
+   desde `functions/`. El verificador sube un PDF sintético, comprueba que una
+   visita sin sesión no puede descargarlo y elimina el archivo al terminar.
 
-La migración inicial es necesaria para los expedientes que ya existían antes
-de la búsqueda paginada. Añade el RUT normalizado, tokens de búsqueda, estado
-de acta pendiente y documentos en `rutIndex/`. Si detecta RUT duplicados,
-se detiene y los identifica en el error; corrígelos antes de reintentarlo.
+Los PDFs nuevos se suben directamente desde el navegador a Supabase con el
+token Firebase, usando TUS para mostrar el progreso. El bucket admite solo
+PDFs de menos de 10 MB. Firestore guarda la ruta `supabase/<expediente>/<id>`;
+las descargas utilizan el bucket privado y una URL temporal al abrir el acta.
+Si ya existían actas en Firebase Storage, la aplicación conserva la lectura
+y eliminación de esas rutas `actas/...` siempre que el bucket antiguo siga
+disponible.
 
-1. Inicia sesión en Firebase CLI y selecciona el proyecto:
+## Publicar reglas de Firestore
 
-   ```powershell
-   firebase login
-   firebase use --add
-   ```
+La versión actual lee y escribe expedientes directamente desde el navegador.
+Antes de usarla con datos reales, publica `firestore.rules` en el proyecto
+correcto. No hace falta migrar documentos ni desplegar Cloud Functions.
 
-   También puedes pasar `--project <ID_DEL_PROYECTO>` a cada comando de
-   despliegue.
+```powershell
+firebase login
+firebase deploy --only firestore:rules --project <ID_DEL_PROYECTO>
+npm run build
+```
 
-2. Despliega los índices y espera a que Firestore indique que están listos:
-
-   ```powershell
-   firebase deploy --only firestore:indexes --project <ID_DEL_PROYECTO>
-   ```
-
-3. Compila las funciones y autentica Google Cloud CLI con una cuenta que
-   pueda leer y escribir en la base de Firestore del proyecto:
-
-   ```powershell
-   gcloud auth application-default login
-   npm run build --prefix functions
-   npm run migrate:indexes --prefix functions
-   ```
-
-   Ejecuta la migración una vez por cada base existente antes de usar la
-   nueva búsqueda o crear expedientes mediante las funciones. No la ejecutes
-   contra producción sin revisar primero el proyecto seleccionado.
-
-4. Despliega las funciones, las reglas y Storage:
-
-   ```powershell
-   firebase deploy --only functions,firestore:rules,storage --project <ID_DEL_PROYECTO>
-   ```
-
-   Cloud Functions puede requerir facturación habilitada en Firebase/Google
-   Cloud. Comprueba que la región `us-central1` esté disponible y que el
-   despliegue termine correctamente.
-
-5. Despliega el hosting según el proveedor utilizado por el proyecto. El
-   frontend debe compilarse con el `.env` del proyecto correcto:
-
-   ```powershell
-   npm run build
-   ```
-
-   Aún no hay un destino de Hosting configurado en `firebase.json`.
+La compilación del frontend debe usar el `.env` del mismo proyecto. El hosting
+se publica por separado; `firebase.json` aún no configura Firebase Hosting.
 
 ## Almacenamiento y permisos
 
-- En Firebase, la aplicación consulta Firestore y llama a funciones
-  autenticadas para crear y actualizar expedientes. Las funciones comprueban
-  el rol y escriben la auditoría en la subcolección
-  `expedientes/<ID>/auditoria`.
-- El cliente puede leer expedientes y auditorías si tiene rol `direccion`,
-  pero no puede escribirlos directamente. No quites esta restricción para
-  hacer funcionar la app: despliega las funciones.
-- Las actas se guardan en Cloud Storage bajo `actas/<ID_EXPEDIENTE>/`.
-  Solo se admiten PDFs de menos de 10 MB.
+- Las cuentas con rol `direccion` pueden crear y actualizar expedientes en
+  Firestore. El historial se guarda en cada documento junto con el cambio.
+  Así funciona sin Blaze, pero un cliente autorizado podría alterar el
+  historial: no es una auditoría inmutable de servidor.
+- La búsqueda y el resumen leen la colección completa para incluir fichas
+  anteriores sin índices. En bases grandes esto aumenta lecturas; se puede
+  volver a consultas indexadas cuando se migren los documentos.
+- Si una subida falla, revisa la integración Firebase Auth de Supabase, las
+  claims `role` y `direccion`, la URL/clave publicable y las políticas del
+  bucket. La pantalla mostrará el error en lugar de esperar indefinidamente.
 - Sin configuración Firebase, los datos de demostración viven en el
   almacenamiento local del navegador. No se sincronizan entre dispositivos.
 - Si los datos locales están dañados, la app muestra un error y no los
@@ -159,7 +171,6 @@ Desde la raíz:
 ```powershell
 npm test
 npm run build
-npm run build --prefix functions
 ```
 
 Las pruebas unitarias no sustituyen una prueba de integración con Firebase.

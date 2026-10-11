@@ -49,7 +49,7 @@ export interface Expediente extends NuevoExpediente {
   fechaCreacion: string;
   creadoPor: string;
   historialColegiatura: CambioColegiatura[];
-  acta?: Acta;
+  acta?: Acta | null;
   historialAuditoria?: RegistroAuditoria[];
 }
 

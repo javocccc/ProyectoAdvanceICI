@@ -10,17 +10,14 @@ import {
   urlActa,
   validarActa,
 } from "../services/actas";
-import {
-  actualizarExpediente,
-  listarAuditoriaExpediente,
-} from "../services/expedientes";
+import { actualizarExpediente } from "../services/expedientes";
 
 import type {
   Expediente,
   EstadoColegiatura,
-  RegistroAuditoria,
 } from "../types/expediente";
-import { formatearFecha, formatearFechaHora } from "../utils/formato";
+import { formatearFecha } from "../utils/formato";
+import { mensajeErrorFirebase } from "../utils/errorFirebase";
 import "./ExpedienteDetallePage.css";
 
 interface DetalleProps {
@@ -52,12 +49,6 @@ function nombreEstadoColegiatura(estado: EstadoColegiatura): string {
   }
 }
 
-function mostrarValorAuditoria(valor: unknown): string {
-  if (valor === null) return "—";
-  if (typeof valor === "string") return valor;
-  return JSON.stringify(valor) ?? String(valor);
-}
-
 export function ExpedienteDetallePage({
   expediente,
   alVolver,
@@ -73,14 +64,11 @@ export function ExpedienteDetallePage({
   const [observacion, setObservacion] = useState("");
   const [guardandoEstado, setGuardandoEstado] = useState(false);
   const [errorEstado, setErrorEstado] = useState("");
-  const [historialAuditoria, setHistorialAuditoria] = useState<
-    RegistroAuditoria[]
-  >([]);
-  const [cargandoAuditoria, setCargandoAuditoria] = useState(true);
-  const [errorAuditoria, setErrorAuditoria] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [confirmarReemplazo, setConfirmarReemplazo] = useState(false);
+  const [confirmarEliminacion, setConfirmarEliminacion] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [progreso, setProgreso] = useState(0);
   const [errorActa, setErrorActa] = useState("");
   const [mensajeActa, setMensajeActa] = useState("");
@@ -94,54 +82,24 @@ export function ExpedienteDetallePage({
 
   // Si App entrega otra ficha, reiniciamos campos y avisos de la anterior.
   useEffect(() => {
-    let vigente = true;
     setActual(expediente);
     setEstado(expediente.colegiatura);
     setObservacion("");
     setErrorEstado("");
     setArchivo(null);
     setConfirmarReemplazo(false);
+    setConfirmarEliminacion(false);
     setSubiendo(false);
+    setEliminando(false);
     setProgreso(0);
     setErrorActa("");
     setMensajeActa("");
-    setHistorialAuditoria([]);
-    setCargandoAuditoria(true);
-    setErrorAuditoria("");
-    listarAuditoriaExpediente(expediente.id)
-      .then((registros) => {
-        if (vigente) setHistorialAuditoria(registros);
-      })
-      .catch(() => {
-        if (vigente) {
-          setErrorAuditoria("No se pudo cargar el historial de auditoría.");
-        }
-      })
-      .finally(() => {
-        if (vigente) setCargandoAuditoria(false);
-      });
-
     // Cada URL temporal apunta al PDF de una ficha; se libera al cambiar o cerrar.
     return () => {
-      vigente = false;
       if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
       demoUrl.current = null;
     };
   }, [expediente]);
-
-  async function refrescarAuditoria(expedienteId: string) {
-    try {
-      const registros = await listarAuditoriaExpediente(expedienteId);
-      if (expedienteVisibleId.current === expedienteId) {
-        setHistorialAuditoria(registros);
-        setErrorAuditoria("");
-      }
-    } catch {
-      if (expedienteVisibleId.current === expedienteId) {
-        setErrorAuditoria("El cambio se guardó, pero no se pudo actualizar su auditoría.");
-      }
-    }
-  }
 
   /** Guarda el estado y agrega al historial quién lo cambió, cuándo y por qué. */
   async function guardarColegiatura(evento: FormEvent<HTMLFormElement>) {
@@ -169,13 +127,10 @@ export function ExpedienteDetallePage({
             : previo,
         );
         setObservacion("");
-        await refrescarAuditoria(expedienteId);
       }
-    } catch {
+    } catch (problema) {
       if (expedienteVisibleId.current === expedienteId) {
-        setErrorEstado(
-          "No se pudo guardar el estado. Revise la conexión e inténtelo nuevamente.",
-        );
+        setErrorEstado(mensajeErrorFirebase(problema, "guardar"));
       }
     } finally {
       if (expedienteVisibleId.current === expedienteId) {
@@ -188,6 +143,7 @@ export function ExpedienteDetallePage({
   function elegirArchivo(nuevo: File | null) {
     setArchivo(nuevo);
     setConfirmarReemplazo(false);
+    setConfirmarEliminacion(false);
     setErrorActa("");
     setMensajeActa("");
   }
@@ -200,7 +156,7 @@ export function ExpedienteDetallePage({
 
   /** Valida el PDF, pide confirmación si reemplaza uno y guarda su referencia. */
   async function guardarArchivo() {
-    if (!archivo || subiendo || !usuario) return;
+    if (!archivo || subiendo || eliminando || !usuario) return;
     const expedienteId = actual.id;
     const archivoElegido = archivo;
     setErrorActa("");
@@ -235,7 +191,6 @@ export function ExpedienteDetallePage({
             ? { ...previo, acta: actaGuardada }
             : previo,
         );
-        await refrescarAuditoria(expedienteId);
         if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
         // En demo el PDF vive solo en memoria; el servicio guarda su nombre.
         demoUrl.current = actaGuardada.ruta.startsWith("demo/")
@@ -248,7 +203,7 @@ export function ExpedienteDetallePage({
         setMensajeActa(
           actaGuardada.ruta.startsWith("demo/")
             ? "PDF disponible solo mientras mantenga abierta esta ficha. La demostración no respalda archivos."
-            : "Acta guardada en Firebase Storage.",
+            : "Acta guardada en Supabase Storage.",
         );
       }
       // La copia anterior solo se borra cuando la nueva ya quedó registrada.
@@ -264,7 +219,7 @@ export function ExpedienteDetallePage({
           }
         }
       }
-    } catch {
+    } catch (problema) {
       let falloLimpieza = false;
       if (subida) {
         try {
@@ -277,7 +232,7 @@ export function ExpedienteDetallePage({
         setErrorActa(
           falloLimpieza
             ? "No se pudo guardar el acta ni limpiar el archivo subido."
-            : "No se pudo guardar el acta. Revise la conexión e inténtelo nuevamente.",
+            : mensajeErrorFirebase(problema, "acta"),
         );
       }
     } finally {
@@ -287,11 +242,51 @@ export function ExpedienteDetallePage({
     }
   }
 
+  /** Quita la referencia primero para no dejar la ficha apuntando a un PDF borrado. */
+  async function eliminarArchivo() {
+    if (!actual.acta || eliminando || subiendo || !usuario) return;
+    const expedienteId = actual.id;
+    const actaAnterior = actual.acta;
+    setEliminando(true);
+    setErrorActa("");
+    setMensajeActa("");
+    try {
+      await actualizarExpediente(expedienteId, { acta: null }, usuario.email);
+      if (expedienteVisibleId.current === expedienteId) {
+        setActual((previo) =>
+          previo.id === expedienteId ? { ...previo, acta: null } : previo,
+        );
+        setConfirmarEliminacion(false);
+        setConfirmarReemplazo(false);
+        if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
+        demoUrl.current = null;
+      }
+      try {
+        await borrarActa(actaAnterior);
+        if (expedienteVisibleId.current === expedienteId) {
+          setMensajeActa("Acta eliminada. Ya puede subir otro PDF.");
+        }
+      } catch {
+        if (expedienteVisibleId.current === expedienteId) {
+          setErrorActa(
+            "Se quitó el acta del expediente, pero no se pudo borrar el PDF del almacenamiento.",
+          );
+        }
+      }
+    } catch (problema) {
+      if (expedienteVisibleId.current === expedienteId) {
+        setErrorActa(mensajeErrorFirebase(problema, "acta"));
+      }
+    } finally {
+      if (expedienteVisibleId.current === expedienteId) setEliminando(false);
+    }
+  }
+
   /** Abre el acta en otra pestaña cuando hay un archivo disponible. */
   async function abrirArchivo() {
     if (!actual.acta) return;
     setErrorActa("");
-    // Abrimos la pestaña antes de esperar Firebase para que el navegador no
+    // Abrimos la pestaña antes de esperar al proveedor para que el navegador no
     // interprete la apertura tardía como una ventana emergente inesperada.
     const ventana = window.open("", "_blank");
     if (ventana) ventana.opener = null;
@@ -302,11 +297,9 @@ export function ExpedienteDetallePage({
         setErrorActa(
           "El navegador bloqueó la ventana del PDF. Permita ventanas emergentes para este sitio.",
         );
-    } catch {
+    } catch (problema) {
       ventana?.close();
-      setErrorActa(
-        "Esta acta de demostración no tiene un archivo disponible. Vuelva a seleccionarla.",
-      );
+      setErrorActa(mensajeErrorFirebase(problema, "abrirActa"));
     }
   }
 
@@ -319,10 +312,8 @@ export function ExpedienteDetallePage({
         ? await (await fetch(demoUrl.current)).blob()
         : await blobActa(actual.acta);
       descargarBlob(blob, actual.acta.nombre);
-    } catch {
-      setErrorActa(
-        "No se pudo descargar el PDF. En demostración debe volver a seleccionarlo.",
-      );
+    } catch (problema) {
+      setErrorActa(mensajeErrorFirebase(problema, "descargarActa"));
     }
   }
 
@@ -366,7 +357,7 @@ export function ExpedienteDetallePage({
             </div>
             <div>
               <dt>Nota del examen</dt>
-              <dd>{actual.notaExamen?.toFixed(1) ?? "Sin registrar"}</dd>
+              <dd>{actual.notaExamen?.toFixed(1).replace(".", ",") ?? "Sin registrar"}</dd>
             </div>
             <div>
               <dt>Profesor guía</dt>
@@ -464,40 +455,6 @@ export function ExpedienteDetallePage({
             )}
           </section>
           <section className="detail-section">
-            <h2>Auditoría del expediente</h2>
-            {errorAuditoria && (
-              <p className="form-error" role="alert">
-                {errorAuditoria}
-              </p>
-            )}
-            {cargandoAuditoria ? (
-              <p>Cargando historial de auditoría…</p>
-            ) : historialAuditoria.length ? (
-              <ol className="historial-lista">
-                {historialAuditoria.map((registro) => (
-                  <li key={registro.id}>
-                    <strong>{registro.accion}</strong>
-                    <span>
-                      {formatearFechaHora(registro.fecha)} · {registro.usuario}
-                    </span>
-                    <p>{registro.detalles}</p>
-                    {registro.valores &&
-                      Object.entries(registro.valores).map(
-                        ([campo, valores]) => (
-                          <p key={campo}>
-                            {campo}: {mostrarValorAuditoria(valores.anterior)}{" "}
-                            → {mostrarValorAuditoria(valores.nuevo)}
-                          </p>
-                        ),
-                      )}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p>Aún no hay acciones auditadas.</p>
-            )}
-          </section>
-          <section className="detail-section">
             <h2>Acta de examen</h2>
             <div className="document-status">
               <Icon name="file" size={21} />
@@ -509,6 +466,7 @@ export function ExpedienteDetallePage({
                   className="inline-action"
                   type="button"
                   onClick={() => void abrirArchivo()}
+                  disabled={eliminando}
                 >
                   Abrir
                 </button>
@@ -516,8 +474,28 @@ export function ExpedienteDetallePage({
                   className="inline-action"
                   type="button"
                   onClick={() => void descargarArchivo()}
+                  disabled={eliminando}
                 >
                   Descargar
+                </button>
+                <button
+                  className="inline-action acta-delete"
+                  type="button"
+                  onClick={() => setConfirmarEliminacion(true)}
+                  disabled={subiendo || eliminando}
+                >
+                  Eliminar PDF
+                </button>
+              </div>
+            )}
+            {confirmarEliminacion && actual.acta && (
+              <div className="confirmar-acta" role="group" aria-label="Confirmar eliminación del PDF">
+                <p>¿Eliminar el PDF actual? Podrá subir otro después.</p>
+                <button className="button button-secondary" type="button" onClick={() => setConfirmarEliminacion(false)} disabled={eliminando}>
+                  Cancelar
+                </button>
+                <button className="button button-danger" type="button" onClick={() => void eliminarArchivo()} disabled={eliminando}>
+                  {eliminando ? "Eliminando…" : "Sí, eliminar PDF"}
                 </button>
               </div>
             )}
@@ -525,7 +503,7 @@ export function ExpedienteDetallePage({
               className="acta-dropzone"
               htmlFor="archivo-acta"
               onDragOver={(e) => e.preventDefault()}
-              onDrop={soltarArchivo}
+              onDrop={eliminando ? undefined : soltarArchivo}
             >
               <Icon name="file" size={23} />
               <strong>
@@ -536,17 +514,19 @@ export function ExpedienteDetallePage({
                 id="archivo-acta"
                 type="file"
                 accept="application/pdf,.pdf"
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  elegirArchivo(e.target.files?.[0] ?? null)
-                }
+                disabled={subiendo || eliminando}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  elegirArchivo(e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
               />
             </label>
-            {archivo && !confirmarReemplazo && (
+            {archivo && !confirmarReemplazo && !confirmarEliminacion && (
               <button
                 className="button button-primary acta-submit"
                 type="button"
                 onClick={() => void guardarArchivo()}
-                disabled={subiendo}
+                disabled={subiendo || eliminando}
               >
                 {actual.acta ? "Reemplazar acta" : "Subir acta"}
               </button>
@@ -581,7 +561,7 @@ export function ExpedienteDetallePage({
             {subiendo && (
               <div className="acta-progress">
                 <label htmlFor="progreso-acta">
-                  Subiendo acta: {progreso}%
+                  {progreso === 100 ? "Guardando acta en el expediente…" : `Subiendo acta: ${progreso}%`}
                 </label>
                 <progress id="progreso-acta" value={progreso} max="100" />
               </div>
