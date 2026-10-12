@@ -26,12 +26,14 @@ try {
   const ruleset = await leerJson(`https://firebaserules.googleapis.com/v1/${release.rulesetName}`);
   const remoto = ruleset.source.files.map((archivo) => archivo.content).join("\n");
   const local = readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8");
-  const normalizar = (texto) => texto.replace(/\r\n/g, "\n").trim();
+  const normalizar = (texto) => texto.replace(/\r\n/g, "\n")
+    .split("\n").map((linea) => linea.trim()).filter(Boolean).join("\n");
   console.log(`Reglas publicadas: ${release.updateTime}`);
   console.log(`Coinciden con firestore.rules: ${normalizar(remoto) === normalizar(local)}`);
-  const escriturasDireccion = /allow\s+read,\s*write:\s*if\s+esDireccion\(\)/.test(remoto)
-    || /allow\s+get,\s*list,\s*create,\s*update:\s*if\s+esDireccion\(\)/.test(remoto);
-  console.log(`Permiten escrituras directas de Dirección: ${escriturasDireccion}`);
+  const rolesActivos = /allow\s+get,\s*list:\s*if\s+puedeLeer\(\)/.test(remoto)
+    && /allow\s+create:\s*if\s+esDireccion\(\)\s*\|\|\s*\(esSecretaria\(\)/.test(remoto)
+    && /allow\s+update:\s*if\s+esDireccion\(\)\s*\|\|\s*\(esSecretaria\(\)/.test(remoto);
+  console.log(`Permisos Dirección/Secretaría/Consulta publicados: ${rolesActivos}`);
   if (process.argv.includes("--show-permissions")) {
     console.log("Permisos publicados:");
     for (const linea of remoto.split(/\r?\n/).filter((valor) => /\ballow\b/.test(valor)))

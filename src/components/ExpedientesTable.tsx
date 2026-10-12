@@ -8,6 +8,7 @@ interface TablaProps {
   expedientes: Expediente[];
   alAbrir: (id: string) => void;
   alEditar: (id: string) => void;
+  puedeEditar: boolean;
 }
 
 /** Tabla compartida por el panel y la pantalla de búsqueda. */
@@ -15,6 +16,7 @@ export function ExpedientesTable({
   expedientes,
   alAbrir,
   alEditar,
+  puedeEditar,
 }: TablaProps) {
   // La misma tabla muestra un estado vacío si la búsqueda no encontró filas.
   if (expedientes.length === 0)
@@ -124,7 +126,7 @@ export function ExpedientesTable({
               </td>
               <td>
                 <div className="row-actions">
-                  <button
+                  {puedeEditar && <button
                     type="button"
                     className="row-edit"
                     onClick={() => alEditar(item.id)}
@@ -132,7 +134,7 @@ export function ExpedientesTable({
                   >
                     <Icon name="edit" size={17} />
                     <span>Editar</span>
-                  </button>
+                  </button>}
                   <button
                     type="button"
                     className="row-open"

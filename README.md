@@ -58,7 +58,7 @@ reales ni como mecanismo de autenticación de producción.
 
 6. En Firebase Authentication, crea la cuenta de cada persona autorizada.
    Obtén el UID de la cuenta y crea manualmente en Firestore el documento
-   `usuarios/<UID>` con este contenido:
+   `usuarios/<UID>` con el rol correspondiente:
 
    ```json
    {
@@ -66,9 +66,16 @@ reales ni como mecanismo de autenticación de producción.
    }
    ```
 
-   Las reglas de Firestore exigen ese rol para leer y escribir expedientes.
-   Supabase usa una claim de Firebase sincronizada desde ese documento. La
-   aplicación no modifica documentos `usuarios`.
+   Los valores permitidos son `direccion`, `secretaria` y `consulta`.
+   Dirección puede leer, crear y editar expedientes, cambiar colegiatura y
+   gestionar actas. Secretaría puede leer, crear y editar los datos académicos;
+   no puede cambiar colegiatura ni gestionar actas. Consulta solo puede leer
+   expedientes. La interfaz lee el rol de este documento y las reglas de
+   Firestore verifican cada operación. Sin documento o con un rol desconocido,
+   la cuenta no entra al espacio de trabajo. La aplicación no modifica
+   documentos `usuarios`. En la ficha, Secretaría y Consulta ven
+   «Reservado para el rol Dirección» en lugar del formulario de colegiatura,
+   el historial de cambios y la sección de actas PDF.
 
 7. Instala dependencias con `npm install`. El directorio `functions/` conserva
    una implementación anterior; la aplicación actual no lo llama ni lo despliega.
@@ -110,7 +117,10 @@ reales ni como mecanismo de autenticación de producción.
 
    El primer comando del script solo muestra los cambios. `--apply` los
    aplica; no reemplaza otras claims de la cuenta. Repite el proceso al dar
-   de alta o revocar el rol de Dirección. Las credenciales de administrador
+   de alta o revocar el rol de Dirección. Al pasar una cuenta de Dirección a
+   Secretaría o Consulta, vuelve a ejecutar `--apply` para quitar la claim
+   `direccion`, y pide a esa persona cerrar e iniciar sesión para renovar su
+   token. Las credenciales de administrador
    se configuran fuera del repositorio mediante Application Default
    Credentials. Descarga la cuenta de servicio solo desde la configuración
    de Firebase si tienes acceso de administrador; guarda ese JSON fuera del
@@ -147,8 +157,10 @@ se publica por separado; `firebase.json` aún no configura Firebase Hosting.
 
 ## Almacenamiento y permisos
 
-- Las cuentas con rol `direccion` pueden crear y actualizar expedientes en
-  Firestore. El historial se guarda en cada documento junto con el cambio.
+- Dirección puede crear y actualizar todo el expediente; Secretaría solo los
+  campos académicos. Consulta puede leerlo. Firestore aplica estos límites
+  aunque alguien intente llamar directamente al servicio desde el navegador.
+  El historial se guarda en cada documento junto con el cambio.
   Así funciona sin Blaze, pero un cliente autorizado podría alterar el
   historial: no es una auditoría inmutable de servidor.
 - La búsqueda y el resumen leen la colección completa para incluir fichas

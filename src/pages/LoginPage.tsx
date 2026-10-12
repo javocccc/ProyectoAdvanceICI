@@ -133,7 +133,7 @@ export function LoginPage() {
             </button>
           </form>
           <p className="login-help">
-            Acceso reservado para Dirección ICI.
+            Acceso para usuarios autorizados de Advance ICI.
           </p>
         </div>
       </section>

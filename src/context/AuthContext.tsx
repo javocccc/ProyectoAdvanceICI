@@ -8,19 +8,24 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { esRol, type Rol } from "../auth/roles";
 import { auth } from "../services/firebase";
+import { db } from "../services/firebase";
 
 /** Datos mínimos que necesita la interfaz. Nunca guardamos la contraseña. */
 export interface UsuarioSesion {
   id: string;
   email: string;
   nombre: string;
+  rol: Rol | null;
 }
 
 /** Las funciones y datos que cualquier pantalla puede obtener con useAuth(). */
 interface ValorAuthContext {
   usuario: UsuarioSesion | null;
   cargando: boolean;
+  errorPermiso: string;
   ingresar: (email: string, clave: string, recordar: boolean) => Promise<void>;
   salir: () => Promise<void>;
 }
@@ -39,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // antes de que Firebase termine de comprobar si ya había una sesión abierta.
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [errorPermiso, setErrorPermiso] = useState("");
 
   // Se ejecuta al montar el proveedor. Devuelve la función de desuscripción
   // de Firebase para dejar de escuchar cambios cuando el proveedor se cierre.
@@ -48,7 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const guardado = sessionStorage.getItem(CLAVE_SESION_DEMO);
       if (guardado) {
         try {
-          setUsuario(JSON.parse(guardado) as UsuarioSesion);
+          const sesion = JSON.parse(guardado) as UsuarioSesion;
+          setUsuario({ ...sesion, rol: "direccion" });
         } catch {
           sessionStorage.removeItem(CLAVE_SESION_DEMO);
         }
@@ -57,23 +64,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Firebase avisa cada vez que cambia la sesión, incluso después de recargar.
-    // El permiso para leer fichas lo comprueban las reglas, no este contexto.
-    return onAuthStateChanged(auth, (cuenta) => {
-      setUsuario(
-        cuenta
-          ? {
-              id: cuenta.uid,
-              email: cuenta.email ?? "",
-              nombre:
-                cuenta.displayName ||
-                cuenta.email?.split("@")[0] ||
-                "Dirección ICI",
-            }
-          : null,
-      );
-      setCargando(false);
+    // El rol se lee de la ficha del UID autenticado, nunca del correo ni del
+    // almacenamiento del navegador. Las reglas de Firestore vuelven a comprobarlo.
+    let vigente = true;
+    let revision = 0;
+    const desuscribir = onAuthStateChanged(auth, async (cuenta) => {
+      const actual = ++revision;
+      if (!cuenta) {
+        if (vigente) {
+          setUsuario(null);
+          setErrorPermiso("");
+          setCargando(false);
+        }
+        return;
+      }
+      setCargando(true);
+      setUsuario(null);
+      try {
+        if (!db) throw new Error("Firestore no está configurado.");
+        const ficha = await getDoc(doc(db, "usuarios", cuenta.uid));
+        if (!vigente || actual !== revision) return;
+        const rol = ficha.exists() && esRol(ficha.data().rol) ? ficha.data().rol as Rol : null;
+        setUsuario({
+          id: cuenta.uid,
+          email: cuenta.email ?? "",
+          nombre: cuenta.displayName || cuenta.email?.split("@")[0] || "Usuario ICI",
+          rol,
+        });
+        setErrorPermiso(rol ? "" : "Esta cuenta no tiene un rol asignado. Solicite acceso al administrador.");
+      } catch {
+        if (!vigente || actual !== revision) return;
+        setUsuario({
+          id: cuenta.uid,
+          email: cuenta.email ?? "",
+          nombre: cuenta.displayName || cuenta.email?.split("@")[0] || "Usuario ICI",
+          rol: null,
+        });
+        setErrorPermiso("No se pudo verificar el rol de esta cuenta. Intente ingresar nuevamente.");
+      } finally {
+        if (vigente && actual === revision) setCargando(false);
+      }
     });
+    return () => {
+      vigente = false;
+      desuscribir();
+    };
   }, []);
 
   /** El login llama a esta función; Firebase o demo actualizan usuario. */
@@ -94,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "Datos incorrectos. Use las credenciales de demostración indicadas.",
       );
     }
-    const demo = { id: "direccion-demo", email, nombre: "Dirección ICI" };
+    const demo: UsuarioSesion = { id: "direccion-demo", email, nombre: "Dirección ICI", rol: "direccion" };
     sessionStorage.setItem(CLAVE_SESION_DEMO, JSON.stringify(demo));
     setUsuario(demo);
   }
@@ -104,12 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (auth) await signOut(auth);
     sessionStorage.removeItem(CLAVE_SESION_DEMO);
     setUsuario(null);
+    setErrorPermiso("");
   }
 
   // Cuando cambia usuario, React vuelve a renderizar los consumidores de
   // useAuth(), como App y el formulario de ingreso.
   return (
-    <AuthContext.Provider value={{ usuario, cargando, ingresar, salir }}>
+    <AuthContext.Provider value={{ usuario, cargando, errorPermiso, ingresar, salir }}>
       {children}
     </AuthContext.Provider>
   );

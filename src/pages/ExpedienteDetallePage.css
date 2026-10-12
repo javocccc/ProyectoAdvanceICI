@@ -38,6 +38,16 @@
   color: var(--navy);
   font-size: 14px;
 }
+.ficha-grid .detail-restricted {
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  border: 1px solid #d9e3f5;
+  border-radius: 7px;
+  background: #f0f4ff;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 600;
+}
 /* Cada cambio aparece como un elemento de la lista cronológica. */
 .ficha-grid .historial-lista {
   list-style: none;

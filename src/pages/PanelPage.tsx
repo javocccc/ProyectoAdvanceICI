@@ -14,6 +14,7 @@ interface PanelProps {
   alEditar: (id: string) => void;
   alNuevo: () => void;
   alVerTodos: () => void;
+  puedeEditar: boolean;
 }
 
 export function PanelPage({
@@ -22,6 +23,7 @@ export function PanelPage({
   alEditar,
   alNuevo,
   alVerTodos,
+  puedeEditar,
 }: PanelProps) {
   const [texto, setTexto] = useState("");
   const [resumen, setResumen] = useState<ResumenExpedientes | null>(null);
@@ -66,13 +68,13 @@ export function PanelPage({
           <h1>Vista general</h1>
           <p>El estado de los expedientes, en un solo lugar.</p>
         </div>
-        <button
+        {puedeEditar && <button
           className="button button-primary"
           type="button"
           onClick={alNuevo}
         >
           <Icon name="plus" size={19} /> Nuevo expediente
-        </button>
+        </button>}
       </div>
 
       <section className="overview-intro" aria-label="Resumen de expedientes">
@@ -157,6 +159,7 @@ export function PanelPage({
                 expedientes={resumen.recientes}
                 alAbrir={alAbrir}
                 alEditar={alEditar}
+                puedeEditar={puedeEditar}
               />
             ) : errorResumen ? (
               <p className="data-error" role="alert">

@@ -3,6 +3,7 @@ import type { ChangeEvent, DragEvent, FormEvent } from "react";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
+import { tienePermiso } from "../auth/roles";
 import {
   borrarActa,
   blobActa,
@@ -55,6 +56,9 @@ export function ExpedienteDetallePage({
   alEditar,
 }: DetalleProps) {
   const { usuario } = useAuth();
+  const puedeEditar = tienePermiso(usuario?.rol ?? null, "editarExpedientes");
+  const puedeCambiarColegiatura = tienePermiso(usuario?.rol ?? null, "cambiarColegiatura");
+  const puedeGestionarActas = tienePermiso(usuario?.rol ?? null, "gestionarActas");
   // "actual" refleja inmediatamente lo guardado; App volverá a consultar al
   // cambiar de pantalla. Los demás estados manejan los dos formularios.
   const [actual, setActual] = useState(expediente);
@@ -104,7 +108,7 @@ export function ExpedienteDetallePage({
   /** Guarda el estado y agrega al historial quién lo cambió, cuándo y por qué. */
   async function guardarColegiatura(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    if (!usuario || guardandoEstado || estado === actual.colegiatura) return;
+    if (!usuario || !puedeCambiarColegiatura || guardandoEstado || estado === actual.colegiatura) return;
     const expedienteId = actual.id;
 
     setGuardandoEstado(true);
@@ -156,7 +160,7 @@ export function ExpedienteDetallePage({
 
   /** Valida el PDF, pide confirmación si reemplaza uno y guarda su referencia. */
   async function guardarArchivo() {
-    if (!archivo || subiendo || eliminando || !usuario) return;
+    if (!archivo || subiendo || eliminando || !usuario || !puedeGestionarActas) return;
     const expedienteId = actual.id;
     const archivoElegido = archivo;
     setErrorActa("");
@@ -244,7 +248,7 @@ export function ExpedienteDetallePage({
 
   /** Quita la referencia primero para no dejar la ficha apuntando a un PDF borrado. */
   async function eliminarArchivo() {
-    if (!actual.acta || eliminando || subiendo || !usuario) return;
+    if (!actual.acta || eliminando || subiendo || !usuario || !puedeGestionarActas) return;
     const expedienteId = actual.id;
     const actaAnterior = actual.acta;
     setEliminando(true);
@@ -284,7 +288,7 @@ export function ExpedienteDetallePage({
 
   /** Abre el acta en otra pestaña cuando hay un archivo disponible. */
   async function abrirArchivo() {
-    if (!actual.acta) return;
+    if (!actual.acta || !puedeGestionarActas) return;
     setErrorActa("");
     // Abrimos la pestaña antes de esperar al proveedor para que el navegador no
     // interprete la apertura tardía como una ventana emergente inesperada.
@@ -305,7 +309,7 @@ export function ExpedienteDetallePage({
 
   /** Descarga el acta con el nombre que tenía al subirla. */
   async function descargarArchivo() {
-    if (!actual.acta) return;
+    if (!actual.acta || !puedeGestionarActas) return;
     setErrorActa("");
     try {
       const blob = demoUrl.current
@@ -332,13 +336,13 @@ export function ExpedienteDetallePage({
         </div>
         <div className="detail-heading-actions">
           <EstadoBadge estado={actual.colegiatura} />
-          <button
+          {puedeEditar && <button
             className="button button-secondary"
             type="button"
             onClick={alEditar}
           >
             <Icon name="edit" size={17} /> Editar expediente
-          </button>
+          </button>}
         </div>
       </div>
       <div className="detail-grid ficha-grid">
@@ -395,7 +399,7 @@ export function ExpedienteDetallePage({
                 situación antes de cerrar el expediente.
               </p>
             )}
-            <form className="ficha-form" onSubmit={guardarColegiatura}>
+            {puedeCambiarColegiatura ? <form className="ficha-form" onSubmit={guardarColegiatura}>
               <label htmlFor="estado-colegiatura">
                 Cambiar estado
                 <select
@@ -432,9 +436,11 @@ export function ExpedienteDetallePage({
               >
                 {guardandoEstado ? "Guardando…" : "Guardar estado"}
               </button>
-            </form>
+            </form> : <p className="detail-restricted">Reservado para el rol Dirección</p>}
             <h3>Historial de cambios</h3>
-            {actual.historialColegiatura.length ? (
+            {!puedeCambiarColegiatura ? (
+              <p className="detail-restricted">Reservado para el rol Dirección</p>
+            ) : actual.historialColegiatura.length ? (
               <ol className="historial-lista">
                 {[...actual.historialColegiatura]
                   .reverse()
@@ -456,11 +462,15 @@ export function ExpedienteDetallePage({
           </section>
           <section className="detail-section">
             <h2>Acta de examen</h2>
+            {!puedeGestionarActas ? (
+              <p className="detail-restricted">Reservado para el rol Dirección</p>
+            ) : (
+            <>
             <div className="document-status">
               <Icon name="file" size={21} />
               <span>{actual.acta?.nombre ?? "Aún no se adjunta un acta"}</span>
             </div>
-            {actual.acta && (
+            {actual.acta && puedeGestionarActas && (
               <div className="acta-actions">
                 <button
                   className="inline-action"
@@ -488,7 +498,7 @@ export function ExpedienteDetallePage({
                 </button>
               </div>
             )}
-            {confirmarEliminacion && actual.acta && (
+            {puedeGestionarActas && confirmarEliminacion && actual.acta && (
               <div className="confirmar-acta" role="group" aria-label="Confirmar eliminación del PDF">
                 <p>¿Eliminar el PDF actual? Podrá subir otro después.</p>
                 <button className="button button-secondary" type="button" onClick={() => setConfirmarEliminacion(false)} disabled={eliminando}>
@@ -499,7 +509,7 @@ export function ExpedienteDetallePage({
                 </button>
               </div>
             )}
-            <label
+            {puedeGestionarActas && <label
               className="acta-dropzone"
               htmlFor="archivo-acta"
               onDragOver={(e) => e.preventDefault()}
@@ -520,8 +530,8 @@ export function ExpedienteDetallePage({
                   e.target.value = "";
                 }}
               />
-            </label>
-            {archivo && !confirmarReemplazo && !confirmarEliminacion && (
+            </label>}
+            {puedeGestionarActas && archivo && !confirmarReemplazo && !confirmarEliminacion && (
               <button
                 className="button button-primary acta-submit"
                 type="button"
@@ -531,7 +541,7 @@ export function ExpedienteDetallePage({
                 {actual.acta ? "Reemplazar acta" : "Subir acta"}
               </button>
             )}
-            {confirmarReemplazo && (
+            {puedeGestionarActas && confirmarReemplazo && (
               <div
                 className="confirmar-acta"
                 role="group"
@@ -558,7 +568,7 @@ export function ExpedienteDetallePage({
                 </button>
               </div>
             )}
-            {subiendo && (
+            {puedeGestionarActas && subiendo && (
               <div className="acta-progress">
                 <label htmlFor="progreso-acta">
                   {progreso === 100 ? "Guardando acta en el expediente…" : `Subiendo acta: ${progreso}%`}
@@ -582,6 +592,8 @@ export function ExpedienteDetallePage({
                 solo mientras esta ficha permanezca abierta.
               </p>
             ) : null}
+            </>
+            )}
           </section>
         </div>
       </div>

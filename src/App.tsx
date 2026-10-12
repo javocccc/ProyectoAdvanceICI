@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./components/Icon";
+import { nombreRol, tienePermiso } from "./auth/roles";
 import { useAuth } from "./context/AuthContext";
 import { obtenerExpediente } from "./services/expedientes";
 import { mensajeErrorAlmacenamientoDemo } from "./services/almacenamientoDemo";
@@ -17,10 +18,12 @@ type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle";
 
 export default function App() {
   // useAuth lee el valor que AuthProvider publicó desde main.tsx.
-  const { usuario, cargando, salir } = useAuth();
+  const { usuario, cargando, errorPermiso, salir } = useAuth();
+  const puedeEditar = tienePermiso(usuario?.rol ?? null, "editarExpedientes");
   // App conserva la navegación y la ficha seleccionada; los listados consultan
   // sus páginas directamente al servicio de datos.
   const [vista, setVista] = useState<Vista>("panel");
+  const vistaSegura = !puedeEditar && (vista === "nuevo" || vista === "editar") ? "panel" : vista;
   const [historial, setHistorial] = useState<Vista[]>([]);
   const [expedienteActual, setExpedienteActual] =
     useState<Expediente | null>(null);
@@ -33,7 +36,7 @@ export default function App() {
   // Las fichas se cargan individualmente al abrir o editar, nunca descargando
   // la colección completa desde App.
   useEffect(() => {
-    if (!usuario || !seleccionado || (vista !== "detalle" && vista !== "editar"))
+    if (!usuario?.rol || !seleccionado || (vistaSegura !== "detalle" && vistaSegura !== "editar"))
       return;
     let vigente = true;
     setErrorDatos("");
@@ -61,10 +64,11 @@ export default function App() {
     return () => {
       vigente = false;
     };
-  }, [usuario, vista, seleccionado]);
+  }, [usuario, vistaSegura, seleccionado]);
 
   /** Cambia la pantalla visible y cierra el menú móvil. */
   function navegar(destino: Vista) {
+    if (!puedeEditar && (destino === "nuevo" || destino === "editar")) return;
     if (destino !== vista)
       setHistorial((anterior) => [...anterior, vista]);
     setVista(destino);
@@ -85,6 +89,7 @@ export default function App() {
   }
   /** Abre el formulario de edición para la ficha elegida. */
   function editar(id: string) {
+    if (!puedeEditar) return;
     setSeleccionado(id);
     navegar("editar");
   }
@@ -102,6 +107,17 @@ export default function App() {
   if (cargando)
     return <div className="startup-loading">Cargando Advance ICI…</div>;
   if (!usuario) return <LoginPage />;
+  if (!usuario.rol) return (
+    <main className="startup-loading" role="alert">
+      <div>
+        <h1>Acceso pendiente</h1>
+        <p>{errorPermiso}</p>
+        <button className="button button-secondary" type="button" onClick={() => void salir()}>
+          Cerrar sesión
+        </button>
+      </div>
+    </main>
+  );
 
   return (
     <div className="app-shell">
@@ -120,7 +136,7 @@ export default function App() {
         <nav className="side-nav">
           <button
             type="button"
-            className={vista === "panel" ? "active" : ""}
+            className={vistaSegura === "panel" ? "active" : ""}
             onClick={() => navegar("panel")}
           >
             <Icon name="grid" /> Panel principal
@@ -128,7 +144,7 @@ export default function App() {
           <button
             type="button"
             className={
-              vista === "expedientes" || vista === "detalle" ? "active" : ""
+              vistaSegura === "expedientes" || vistaSegura === "detalle" ? "active" : ""
             }
             onClick={() => {
               setBusqueda("");
@@ -137,13 +153,13 @@ export default function App() {
           >
             <Icon name="folder" /> Expedientes
           </button>
-          <button
+          {puedeEditar && <button
             type="button"
-            className={vista === "nuevo" ? "active" : ""}
+            className={vistaSegura === "nuevo" ? "active" : ""}
             onClick={() => navegar("nuevo")}
           >
             <Icon name="plus" /> Nuevo expediente
-          </button>
+          </button>}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-identity">
@@ -151,7 +167,7 @@ export default function App() {
               <Icon name="user" size={21} />
             </span>
             <span>
-              <strong>Dirección ICI</strong>
+              <strong>{nombreRol[usuario.rol]}</strong>
               <small>{usuario.email}</small>
             </span>
           </div>
@@ -196,11 +212,11 @@ export default function App() {
           <div className="breadcrumb">
             Advance ICI <Icon name="chevron" size={14} />{" "}
             <strong>
-              {vista === "panel"
+              {vistaSegura === "panel"
                 ? "Panel principal"
-                : vista === "nuevo"
+                : vistaSegura === "nuevo"
                   ? "Nuevo expediente"
-                  : vista === "editar"
+                  : vistaSegura === "editar"
                     ? "Editar expediente"
                   : "Expedientes"}
             </strong>
@@ -209,7 +225,7 @@ export default function App() {
             <span className="demo-label">
               {firebaseConfigurado ? "Datos Firebase" : "Datos de demostración"}
             </span>
-            <span className="topbar-avatar">DI</span>
+            <span className="topbar-avatar">{usuario.nombre.slice(0, 2).toUpperCase()}</span>
           </div>
         </header>
         <main className="main-content">
@@ -219,35 +235,37 @@ export default function App() {
             </p>
           )}
           {cargandoExpediente &&
-          (vista === "detalle" || vista === "editar") ? (
+          (vistaSegura === "detalle" || vistaSegura === "editar") ? (
             <div className="content-loading">Cargando expedientes…</div>
           ) : (
             <>
-              {vista === "panel" && (
+              {vistaSegura === "panel" && (
                 <PanelPage
                   alBuscar={buscar}
                   alAbrir={abrir}
                   alEditar={editar}
                   alNuevo={() => navegar("nuevo")}
                   alVerTodos={() => navegar("expedientes")}
+                  puedeEditar={puedeEditar}
                 />
               )}
-              {vista === "expedientes" && (
+              {vistaSegura === "expedientes" && (
                 <ExpedientesPage
                   key={busqueda}
                   busquedaInicial={busqueda}
                   alAbrir={abrir}
                   alEditar={editar}
                   alNuevo={() => navegar("nuevo")}
+                  puedeEditar={puedeEditar}
                 />
               )}
-              {vista === "nuevo" && (
+              {vistaSegura === "nuevo" && puedeEditar && (
                 <NuevoExpedientePage
                   alCancelar={volver}
                   alGuardar={abrir}
                 />
               )}
-              {vista === "editar" && expedienteActual && (
+              {vistaSegura === "editar" && puedeEditar && expedienteActual && (
                 <NuevoExpedientePage
                   key={expedienteActual.id}
                   expediente={expedienteActual}
@@ -255,7 +273,7 @@ export default function App() {
                   alGuardar={despuesDeEditar}
                 />
               )}
-              {vista === "detalle" && expedienteActual && (
+              {vistaSegura === "detalle" && expedienteActual && (
                 <ExpedienteDetallePage
                   expediente={expedienteActual}
                   alVolver={volver}

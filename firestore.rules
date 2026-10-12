@@ -1,21 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Solo una cuenta autenticada con rol direccion puede leer o modificar fichas.
+    // El documento usuarios/<uid> lo administra alguien con acceso a Firebase.
+    function rolUsuario() {
+      return request.auth == null ? null
+        : get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
+    }
+
+    function puedeLeer() {
+      return rolUsuario() in ['direccion', 'secretaria', 'consulta'];
+    }
+
     function esDireccion() {
-      // El uid de Authentication debe tener un documento usuarios/<uid>
-      // creado por un administrador con rol "direccion".
-      return request.auth != null
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'direccion';
+      return rolUsuario() == 'direccion';
+    }
+
+    function esSecretaria() {
+      return rolUsuario() == 'secretaria';
+    }
+
+    function creacionSecretaria() {
+      return request.resource.data.colegiatura == 'sin-informar'
+        && !('acta' in request.resource.data)
+        && !('fechaColegiatura' in request.resource.data)
+        && request.resource.data.historialColegiatura == [];
+    }
+
+    function edicionAcademicaSecretaria() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'nombre', 'rut', 'anioEgreso', 'semestreEgreso', 'fechaExamen',
+        'notaExamen', 'comision', 'historialAuditoria'
+      ]);
     }
 
     match /expedientes/{id} {
-      // Dirección registra cambios e historial en el mismo documento.
-      allow get, list, create, update: if esDireccion();
+      allow get, list: if puedeLeer();
+      allow create: if esDireccion() || (esSecretaria() && creacionSecretaria());
+      allow update: if esDireccion() || (esSecretaria() && edicionAcademicaSecretaria());
       allow delete: if false;
 
       match /auditoria/{registroId} {
-        allow get, list: if esDireccion();
+        allow get, list: if puedeLeer();
         allow create, update, delete: if false;
       }
     }

@@ -16,6 +16,7 @@ interface ExpedientesProps {
   alAbrir: (id: string) => void;
   alEditar: (id: string) => void;
   alNuevo: () => void;
+  puedeEditar: boolean;
 }
 
 export function ExpedientesPage({
@@ -23,6 +24,7 @@ export function ExpedientesPage({
   alAbrir,
   alEditar,
   alNuevo,
+  puedeEditar,
 }: ExpedientesProps) {
   const [busqueda, setBusqueda] = useState(busquedaInicial);
   const [filtro, setFiltro] = useState<FiltroExpedientes>("todos");
@@ -88,13 +90,13 @@ export function ExpedientesPage({
           <h1>Expedientes</h1>
           <p>Consulte el avance de cada estudiante.</p>
         </div>
-        <button
+        {puedeEditar && <button
           className="button button-primary"
           type="button"
           onClick={alNuevo}
         >
           <Icon name="plus" size={19} /> Nuevo expediente
-        </button>
+        </button>}
       </div>
       <section className="listing-panel" aria-label="Listado de expedientes">
         <div className="listing-toolbar">
@@ -146,6 +148,7 @@ export function ExpedientesPage({
               expedientes={expedientes}
               alAbrir={alAbrir}
               alEditar={alEditar}
+              puedeEditar={puedeEditar}
             />
             {total > TAMANO_PAGINA && <nav className="pagination" aria-label="Páginas de expedientes">
               <button

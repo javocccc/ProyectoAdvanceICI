@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
+import { tienePermiso } from "../auth/roles";
 import {
   actualizarExpediente,
   buscarExpedientePorRut,
@@ -138,7 +139,7 @@ export function NuevoExpedientePage({
 
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    if (!usuario || guardando) return;
+    if (!usuario || !tienePermiso(usuario.rol, "editarExpedientes") || guardando) return;
     const encontrados = validarCamposRegistro(campos);
     setErrores(encontrados);
     setErrorGeneral("");
