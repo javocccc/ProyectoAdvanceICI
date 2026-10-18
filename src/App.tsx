@@ -64,7 +64,6 @@ export default function App() {
   const [errorDatos, setErrorDatos] = useState("");
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [estadoSistema, setEstadoSistema] = useState<EstadoSistema | null>(null);
-  const [cargandoEstado, setCargandoEstado] = useState(typeof window !== "undefined");
   const [errorEstado, setErrorEstado] = useState("");
   const vistaSegura = !puedeEditar && (vista === "nuevo" || vista === "editar")
     || !puedeAdministrar && vista === "administracion"
@@ -74,8 +73,7 @@ export default function App() {
   useEffect(() => {
     obtenerEstadoSistema()
       .then(setEstadoSistema)
-      .catch(() => setErrorEstado("No se pudo verificar si el sistema está en mantenimiento."))
-      .finally(() => setCargandoEstado(false));
+      .catch(() => setErrorEstado("No se pudo verificar si el sistema está en mantenimiento."));
   }, []);
 
   // Las fichas se cargan individualmente al abrir o editar, nunca descargando
@@ -158,23 +156,23 @@ export default function App() {
   if (paginaPublica) return <PublicPage kind={paginaPublica} />;
   if (!enInicio && !paginaPublica) return <PublicPage kind="404" />;
   if (paginaSolicitada && !paginaPublica) return <PublicPage kind="404" />;
-  if (cargandoEstado) return <div className="startup-loading">Verificando estado del sistema…</div>;
-  if (errorEstado) return (
-    <main className="startup-loading" role="alert">
-      <div>
-        <h1>No se pudo verificar el estado</h1>
-        <p>{errorEstado}</p>
-        <button className="button button-secondary" type="button" onClick={() => window.location.reload()}>
-          Reintentar
-        </button>
-      </div>
-    </main>
-  );
-  if (estadoSistema?.mantenimiento && !puedeAdministrar) return <PublicPage kind="estado" />;
   // Primero se resuelve la sesión; después se decide entre login y aplicación.
   if (cargando)
     return <div className="startup-loading">Cargando Advance ICI…</div>;
-  if (!usuario) return <LoginPage />;
+  if (usuario && estadoSistema?.mantenimiento && !puedeAdministrar) {
+    return <PublicPage kind="estado" />;
+  }
+  if (!usuario) return (
+    <LoginPage
+      statusWarning={
+        errorEstado
+          ? "No se pudo verificar el estado del sistema. El acceso al inicio de sesión continúa disponible; si Firestore falla, las funciones de datos podrían no estar disponibles."
+          : estadoSistema?.mantenimiento
+            ? "El sistema está en mantenimiento. Solo Dirección puede iniciar sesión para gestionar el estado."
+            : undefined
+      }
+    />
+  );
   if (!usuario.rol) return (
     <main className="startup-loading" role="alert">
       <div>
@@ -265,6 +263,11 @@ export default function App() {
         />
       )}
       <div className="workspace">
+        {errorEstado && (
+          <p className="status-warning" role="status">
+            No se pudo verificar el estado de mantenimiento. Puede continuar, pero algunas funciones podrían no estar disponibles.
+          </p>
+        )}
         <header className="topbar">
           <button
             className="topbar-back"

@@ -7,8 +7,12 @@ import { firebaseConfigurado } from "../services/firebase";
 import { urlApp } from "../utils/rutas";
 import { versionAplicacion } from "../utils/version";
 
+interface LoginPageProps {
+  statusWarning?: string;
+}
+
 /** Muestra el formulario de acceso; la verificación real vive en AuthContext. */
-export function LoginPage() {
+export function LoginPage({ statusWarning }: LoginPageProps) {
   // useAuth obtiene ingresar() del proveedor que envuelve la aplicación.
   const { ingresar, recuperarClave } = useAuth();
   // Cada cambio en los campos actualiza el estado y React vuelve a dibujarlos.
@@ -99,6 +103,8 @@ export function LoginPage() {
             <h2 id="login-title">{recuperando ? "Restablecer contraseña" : "Bienvenido de vuelta"}</h2>
             <p>{recuperando ? "Le enviaremos un enlace al correo asociado a su cuenta." : "Ingrese para continuar con los expedientes de titulación."}</p>
           </div>
+
+          {statusWarning && <p className="status-warning" role="status">{statusWarning}</p>}
 
           {!firebaseConfigurado && (
             <div className="demo-note">

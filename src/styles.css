@@ -1520,6 +1520,16 @@ select {
   font-size: 13px;
   margin: 8px 0;
 }
+.status-warning {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #efd49b;
+  border-radius: 9px;
+  background: #fff8e9;
+  color: #785014;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .app-footer nav,
 .public-footer nav {
   display: flex;
