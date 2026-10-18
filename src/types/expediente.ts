@@ -1,4 +1,4 @@
-/** Los tres estados que Dirección puede registrar manualmente. */
+/** Los tres estados que Administración puede registrar manualmente. */
 export type EstadoColegiatura = "al-dia" | "no-al-dia" | "sin-informar";
 
 export interface Acta {
@@ -48,6 +48,7 @@ export interface Expediente extends NuevoExpediente {
   id: string;
   fechaCreacion: string;
   creadoPor: string;
+  estudianteUid?: string;
   historialColegiatura: CambioColegiatura[];
   acta?: Acta | null;
   historialAuditoria?: RegistroAuditoria[];

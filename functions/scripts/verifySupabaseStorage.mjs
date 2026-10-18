@@ -1,4 +1,4 @@
-// Prueba de integración: usa una cuenta existente de Dirección, sube un PDF
+// Prueba de integración: usa una cuenta existente de Administración, sube un PDF
 // sintético a Supabase, comprueba lectura/descarga y elimina el archivo.
 // Requiere GOOGLE_APPLICATION_CREDENTIALS apuntando fuera del repositorio.
 import { readFileSync } from "node:fs";
@@ -54,7 +54,7 @@ async function idTokenFirebase() {
     );
     pagina = resultado.pageToken;
   } while (!cuenta && pagina);
-  if (!cuenta) throw new Error("No hay cuenta de Dirección con claims configuradas.");
+  if (!cuenta) throw new Error("No hay cuenta de Administración con claims configuradas.");
   const tokenPersonalizado = await autenticacion.createCustomToken(cuenta.uid);
   const respuesta = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(env("VITE_FIREBASE_API_KEY"))}`,

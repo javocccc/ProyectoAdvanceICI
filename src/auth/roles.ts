@@ -1,33 +1,43 @@
-/** Roles guardados por un administrador en usuarios/<uid> de Firestore. */
-export type Rol = "direccion" | "secretaria" | "consulta";
+/** Roles stored in usuarios/<uid> de Firestore. */
+export type Rol = "administrador" | "coordinador" | "estudiante";
 
 export type Permiso =
   | "leerExpedientes"
   | "editarExpedientes"
   | "cambiarColegiatura"
-  | "gestionarActas";
+  | "gestionarActas"
+  | "administrarCuentas";
 
 const permisos: Record<Rol, readonly Permiso[]> = {
-  direccion: [
+  administrador: [
     "leerExpedientes",
     "editarExpedientes",
     "cambiarColegiatura",
     "gestionarActas",
+    "administrarCuentas",
   ],
-  secretaria: ["leerExpedientes", "editarExpedientes"],
-  consulta: ["leerExpedientes"],
+  coordinador: ["leerExpedientes", "editarExpedientes", "gestionarActas"],
+  estudiante: ["leerExpedientes"],
 };
 
 export const nombreRol: Record<Rol, string> = {
-  direccion: "Dirección ICI",
-  secretaria: "Secretaría ICI",
-  consulta: "Consulta ICI",
+  administrador: "Administrador",
+  coordinador: "Coordinador",
+  estudiante: "Estudiante",
 };
 
+export function normalizarRol(valor: unknown): Rol | null {
+  if (valor === "administrador" || valor === "direccion") return "administrador";
+  if (valor === "coordinador" || valor === "secretaria") return "coordinador";
+  if (valor === "estudiante" || valor === "consulta") return "estudiante";
+  return null;
+}
+
 export function esRol(valor: unknown): valor is Rol {
-  return valor === "direccion" || valor === "secretaria" || valor === "consulta";
+  return valor === "administrador" || valor === "coordinador" || valor === "estudiante";
 }
 
 export function tienePermiso(rol: Rol | null, permiso: Permiso): boolean {
-  return rol !== null && permisos[rol].includes(permiso);
+  const normalizado = normalizarRol(rol);
+  return normalizado !== null && permisos[normalizado].includes(permiso);
 }

@@ -56,29 +56,50 @@ reales ni como mecanismo de autenticación de producción.
    Los valores `VITE_*` se incluyen en el código público del navegador; la
    protección de los datos depende de Authentication y las reglas de Firestore.
 
-6. En Firebase Authentication, crea la cuenta de cada persona autorizada.
-   Obtén el UID de la cuenta y crea manualmente en Firestore el documento
-   `usuarios/<UID>` con el rol correspondiente:
+6. Antes de usar la administración de cuentas, crea la primera cuenta
+   Administrador en Firebase Authentication y crea manualmente su documento
+   `usuarios/<UID>` en Firestore. Esta cuenta inicial permite invitar a las
+   demás desde la aplicación:
 
    ```json
    {
-     "rol": "direccion"
+     "email": "admin@universidad.cl",
+     "nombre": "Administrador inicial",
+     "rol": "administrador",
+     "activo": true
    }
    ```
 
-   Los valores permitidos son `direccion`, `secretaria` y `consulta`.
-   Dirección puede leer, crear y editar expedientes, cambiar colegiatura y
-   gestionar actas. Secretaría puede leer, crear y editar los datos académicos;
-   no puede cambiar colegiatura ni gestionar actas. Consulta solo puede leer
-   expedientes. La interfaz lee el rol de este documento y las reglas de
-   Firestore verifican cada operación. Sin documento o con un rol desconocido,
-   la cuenta no entra al espacio de trabajo. La aplicación no modifica
-   documentos `usuarios`. En la ficha, Secretaría y Consulta ven
-   «Reservado para el rol Dirección» en lugar del formulario de colegiatura,
-   el historial de cambios y la sección de actas PDF.
+   Los roles son fijos: `administrador`, `coordinador` y `estudiante`.
+   Administración tiene control total de las funciones y puede invitar,
+   cambiar roles y desactivar cuentas; Coordinación puede crear y actualizar
+   expedientes y gestionar actas, pero no administrar cuentas ni cambiar
+   colegiatura; Estudiante solo consulta el expediente asociado a su UID. El
+   perfil del estudiante y el expediente deben apuntarse mutuamente mediante
+   `usuarios/<UID>.expedienteId` y `expedientes/<ID>.estudianteUid`.
+   Los perfiles antiguos `direccion`, `secretaria` y `consulta` se reconocen
+   como alias de esos roles. Los perfiles `consulta` no tendrán acceso a ningún
+   expediente hasta que Administración los vincule.
 
-7. Instala dependencias con `npm install`. El directorio `functions/` conserva
-   una implementación anterior; la aplicación actual no lo llama ni lo despliega.
+7. Despliega las reglas de Firestore, Storage y las cuatro funciones para
+   gestionar cuentas:
+
+   ```powershell
+   firebase deploy --only firestore:rules,storage,functions:listarCuentas,functions:crearCuenta,functions:actualizarCuenta,functions:eliminarCuenta --project <ID_DEL_PROYECTO>
+   ```
+
+   Cloud Functions requiere el plan Firebase Blaze. La primera función de
+   administración verifica en servidor el rol del solicitante; no se puede
+   asignar a uno mismo el rol Administrador desde la interfaz, y no se permite
+   desactivar ni degradar al último Administrador. La desactivación borra la
+   cuenta de Firebase Authentication y conserva un perfil inactivo para
+   trazabilidad. Para invitar una cuenta, el administrador debe enviar el
+   enlace de establecimiento de contraseña generado por Firebase.
+
+8. La pantalla **Administración → Cuentas y roles** permite crear cuentas,
+   cambiar nombre/rol, vincular o cambiar el expediente de un estudiante,
+   reenviar invitaciones y desactivar cuentas. No crea roles personalizados:
+   los tres perfiles de permisos son deliberadamente fijos.
 
 La opción de recuperación de contraseña envía el enlace con Firebase
 Authentication. Configura y prueba la plantilla de correo de restablecimiento
@@ -92,7 +113,7 @@ disponible en el modo de demostración.
    El login sigue ocurriendo únicamente en Firebase.
 2. En el SQL Editor de Supabase, abre `supabase/actas.sql` y ejecútalo. Ya
    incluye el Firebase Project ID `advanceici`. Crea el
-   bucket privado `actas` y políticas para cuentas de Dirección. No hagas
+   bucket privado `actas` y políticas para Administración y Coordinación. No hagas
    público el bucket.
 3. En `.env` completa la URL del proyecto y su **publishable key**:
 
@@ -108,9 +129,9 @@ disponible en el modo de demostración.
    `VITE_SUPABASE_PUBLISHABLE_KEY` como variables del repositorio en
    **Settings → Secrets and variables → Actions → Variables**. El flujo
    `.github/workflows/deploy.yml` las incorpora a la compilación.
-4. Supabase requiere la claim Firebase `role: authenticated`. Las políticas
-   también requieren `direccion: true`. Para asignarlas a cuentas cuyo
-   documento `usuarios/<uid>` tenga `rol: direccion`, ejecuta desde
+4. Supabase requiere las claims Firebase `role: authenticated` y `actas: true`.
+   Las crea automáticamente Cloud Functions al invitar o actualizar el rol.
+   Para cuentas existentes, ejecuta desde
    `functions/` el script con credenciales de administrador de Firebase:
 
    ```powershell
@@ -121,10 +142,9 @@ disponible en el modo de demostración.
    ```
 
    El primer comando del script solo muestra los cambios. `--apply` los
-   aplica; no reemplaza otras claims de la cuenta. Repite el proceso al dar
-   de alta o revocar el rol de Dirección. Al pasar una cuenta de Dirección a
-   Secretaría o Consulta, vuelve a ejecutar `--apply` para quitar la claim
-   `direccion`, y pide a esa persona cerrar e iniciar sesión para renovar su
+   aplica; no reemplaza otras claims de la cuenta. Úsalo para migrar cuentas
+   existentes. Al cambiar manualmente el rol de una cuenta, vuelve a ejecutar
+   `--apply` y pide a esa persona volver a iniciar sesión para renovar su
    token. Las credenciales de administrador
    se configuran fuera del repositorio mediante Application Default
    Credentials. Descarga la cuenta de servicio solo desde la configuración
@@ -147,9 +167,11 @@ disponible.
 
 ## Publicar reglas de Firestore
 
-La versión actual lee y escribe expedientes directamente desde el navegador.
+La aplicación lee y escribe expedientes directamente desde el navegador.
 Antes de usarla con datos reales, publica `firestore.rules` en el proyecto
-correcto. No hace falta migrar documentos ni desplegar Cloud Functions.
+correcto. No hace falta migrar documentos para aplicar estas reglas. La
+administración de cuentas sí requiere las Cloud Functions indicadas en la
+configuración de Firebase.
 
 ```powershell
 firebase login
@@ -171,16 +193,16 @@ se publica por separado; `firebase.json` aún no configura Firebase Hosting.
 - Las fichas ofrecen una exportación JSON con los datos del expediente y su
   historial de cambios. El PDF del acta es un archivo separado y debe
   descargarse aparte, según los permisos actuales de la cuenta.
-- Dirección cuenta con la pantalla **Control y auditoría**. El registro agrega
+- Administración cuenta con la pantalla **Control y auditoría**. El registro agrega
   una entrada al abrir una ficha desde la aplicación y muestra usuario,
   identificador, fecha de servidor y acción, sin duplicar nombre ni RUT. Las
   reglas permiten crear entradas solo para el usuario autenticado, con hora
   de servidor, y prohíben editarlas o borrarlas; la consulta queda restringida
-  a Dirección. Como el evento se registra desde el navegador, una persona
+  a Administración. Como el evento se registra desde el navegador, una persona
   autorizada podría fabricar entradas propias. No es una auditoría forense de
   todas las lecturas: no registra las filas mostradas por listados ni lecturas
   hechas fuera de la interfaz.
-- Dirección puede activar o desactivar mantenimiento desde esa misma pantalla.
+- Administración puede activar o desactivar mantenimiento desde esa misma pantalla.
   Solo el estado y el mensaje de mantenimiento se pueden leer sin iniciar
   sesión; su edición está protegida por rol. El modo demo conserva estas
   opciones y sus registros localmente en el navegador.
@@ -195,17 +217,20 @@ deben considerarse informativas hasta la validación institucional.
 
 ## Almacenamiento y permisos
 
-- Dirección puede crear y actualizar todo el expediente; Secretaría solo los
-  campos académicos. Consulta puede leerlo. Firestore aplica estos límites
+- Administración puede leer, crear y actualizar expedientes, cambiar
+  colegiatura y gestionar actas. Coordinación puede leer, crear y editar
+  expedientes y gestionar actas, pero no cambiar colegiatura. Estudiantes solo
+  pueden leer el expediente vinculado a su UID. Firestore aplica estos límites
   aunque alguien intente llamar directamente al servicio desde el navegador.
-  El historial se guarda en cada documento junto con el cambio.
-  Así funciona sin Blaze, pero un cliente autorizado podría alterar el
-  historial: no es una auditoría inmutable de servidor.
+  Los datos de expediente se siguen operando directamente en Firestore; la
+  administración de cuentas sí requiere las Cloud Functions descritas arriba.
+  El historial de cambios se guarda en cada documento y un cliente autorizado
+  podría alterarlo: no es una auditoría inmutable de servidor.
 - La búsqueda y el resumen leen la colección completa para incluir fichas
   anteriores sin índices. En bases grandes esto aumenta lecturas; se puede
   volver a consultas indexadas cuando se migren los documentos.
 - Si una subida falla, revisa la integración Firebase Auth de Supabase, las
-  claims `role` y `direccion`, la URL/clave publicable y las políticas del
+  claims `role` y `actas`, la URL/clave publicable y las políticas del
   bucket. La pantalla mostrará el error en lugar de esperar indefinidamente.
 - Sin configuración Firebase, los datos de demostración viven en el
   almacenamiento local del navegador. No se sincronizan entre dispositivos.

@@ -479,10 +479,10 @@ export function ExpedienteDetallePage({
               >
                 {guardandoEstado ? "Guardando…" : "Guardar estado"}
               </button>
-            </form> : <p className="detail-restricted">Reservado para el rol Dirección</p>}
+            </form> : <p className="detail-restricted">Reservado para Administración</p>}
             <h3>Historial de cambios</h3>
             {!puedeCambiarColegiatura ? (
-              <p className="detail-restricted">Reservado para el rol Dirección</p>
+              <p className="detail-restricted">Reservado para Administración</p>
             ) : actual.historialColegiatura.length ? (
               <ol className="historial-lista">
                 {[...actual.historialColegiatura]
@@ -506,7 +506,7 @@ export function ExpedienteDetallePage({
           <section className="detail-section">
             <h2>Acta de examen</h2>
             {!puedeGestionarActas ? (
-              <p className="detail-restricted">Reservado para el rol Dirección</p>
+              <p className="detail-restricted">Reservado para Coordinación y Administración</p>
             ) : (
             <>
             <div className="document-status">

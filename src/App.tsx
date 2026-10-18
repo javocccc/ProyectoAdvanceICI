@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./components/Icon";
-import { nombreRol, tienePermiso } from "./auth/roles";
+import { nombreRol, normalizarRol, tienePermiso } from "./auth/roles";
 import { useAuth } from "./context/AuthContext";
 import { obtenerExpediente } from "./services/expedientes";
 import { mensajeErrorAlmacenamientoDemo } from "./services/almacenamientoDemo";
@@ -37,7 +37,8 @@ export default function App() {
   // useAuth lee el valor que AuthProvider publicó desde main.tsx.
   const { usuario, cargando, errorPermiso, salir } = useAuth();
   const puedeEditar = tienePermiso(usuario?.rol ?? null, "editarExpedientes");
-  const puedeAdministrar = usuario?.rol === "direccion";
+  const puedeAdministrar = tienePermiso(usuario?.rol ?? null, "administrarCuentas");
+  const esEstudiante = normalizarRol(usuario?.rol) === "estudiante";
   const baseUrl = import.meta.env.BASE_URL;
   const baseSinBarra = baseUrl.replace(/\/+$/, "");
   const rutaNavegador = typeof window === "undefined" ? baseUrl : window.location.pathname;
@@ -65,10 +66,15 @@ export default function App() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [estadoSistema, setEstadoSistema] = useState<EstadoSistema | null>(null);
   const [errorEstado, setErrorEstado] = useState("");
-  const vistaSegura = !puedeEditar && (vista === "nuevo" || vista === "editar")
-    || !puedeAdministrar && vista === "administracion"
-    ? "panel"
-    : vista;
+  const vistaSegura = esEstudiante
+    ? "detalle"
+    : (!puedeEditar && (vista === "nuevo" || vista === "editar"))
+      || (!puedeAdministrar && vista === "administracion")
+      ? "panel"
+      : vista;
+  const expedienteSeleccionado = usuario?.rol === "estudiante"
+    ? usuario.expedienteId ?? null
+    : seleccionado;
 
   useEffect(() => {
     obtenerEstadoSistema()
@@ -79,12 +85,12 @@ export default function App() {
   // Las fichas se cargan individualmente al abrir o editar, nunca descargando
   // la colección completa desde App.
   useEffect(() => {
-    if (!usuario?.rol || !seleccionado || (vistaSegura !== "detalle" && vistaSegura !== "editar"))
+    if (!usuario?.rol || !expedienteSeleccionado || (vistaSegura !== "detalle" && vistaSegura !== "editar"))
       return;
     let vigente = true;
     setErrorDatos("");
     setCargandoExpediente(true);
-    obtenerExpediente(seleccionado)
+    obtenerExpediente(expedienteSeleccionado)
       .then((expediente) => {
         if (vigente) {
           setExpedienteActual(expediente);
@@ -113,7 +119,7 @@ export default function App() {
     return () => {
       vigente = false;
     };
-  }, [usuario, vistaSegura, seleccionado]);
+  }, [usuario, vistaSegura, expedienteSeleccionado]);
 
   /** Cambia la pantalla visible y cierra el menú móvil. */
   function navegar(destino: Vista) {
@@ -168,7 +174,7 @@ export default function App() {
         errorEstado
           ? "No se pudo verificar el estado del sistema. El acceso al inicio de sesión continúa disponible; si Firestore falla, las funciones de datos podrían no estar disponibles."
           : estadoSistema?.mantenimiento
-            ? "El sistema está en mantenimiento. Solo Dirección puede iniciar sesión para gestionar el estado."
+            ? "El sistema está en mantenimiento. Solo Administración puede iniciar sesión para gestionar el estado."
             : undefined
       }
     />
@@ -201,14 +207,14 @@ export default function App() {
         </div>
         <div className="sidebar-group-title">ESPACIO DE TRABAJO</div>
         <nav className="side-nav">
-          <button
+          {!esEstudiante && <button
             type="button"
             className={vistaSegura === "panel" ? "active" : ""}
             onClick={() => navegar("panel")}
           >
             <Icon name="grid" /> Panel principal
-          </button>
-          <button
+          </button>}
+          {!esEstudiante && <button
             type="button"
             className={
               vistaSegura === "expedientes" || vistaSegura === "detalle" ? "active" : ""
@@ -219,8 +225,8 @@ export default function App() {
             }}
           >
             <Icon name="folder" /> Expedientes
-          </button>
-          {puedeEditar && <button
+          </button>}
+          {!esEstudiante && puedeEditar && <button
             type="button"
             className={vistaSegura === "nuevo" ? "active" : ""}
             onClick={() => navegar("nuevo")}
@@ -232,7 +238,7 @@ export default function App() {
             className={vistaSegura === "administracion" ? "active" : ""}
             onClick={() => navegar("administracion")}
           >
-            <Icon name="settings" /> Control y auditoría
+            <Icon name="settings" /> Administración
           </button>}
         </nav>
         <div className="sidebar-bottom">
@@ -241,7 +247,7 @@ export default function App() {
               <Icon name="user" size={21} />
             </span>
             <span>
-              <strong>{nombreRol[usuario.rol]}</strong>
+              <strong>{nombreRol[normalizarRol(usuario.rol) ?? "estudiante"]}</strong>
               <small>{usuario.email}</small>
             </span>
           </div>
@@ -298,7 +304,7 @@ export default function App() {
                   : vistaSegura === "editar"
                     ? "Editar expediente"
                     : vistaSegura === "administracion"
-                      ? "Control y auditoría"
+                      ? "Administración"
                       : "Expedientes"}
             </strong>
           </div>
@@ -320,7 +326,12 @@ export default function App() {
             <div className="content-loading">Cargando expedientes…</div>
           ) : (
             <>
-              {vistaSegura === "panel" && (
+              {esEstudiante && !usuario.expedienteId ? (
+                <section className="admin-card">
+                  <h1>Expediente pendiente de vinculación</h1>
+                  <p>Su cuenta todavía no está asociada a un expediente. Solicite al Administrador que complete la vinculación.</p>
+                </section>
+              ) : vistaSegura === "panel" && !esEstudiante ? (
                 <PanelPage
                   alBuscar={buscar}
                   alAbrir={abrir}
@@ -329,8 +340,8 @@ export default function App() {
                   alVerTodos={() => navegar("expedientes")}
                   puedeEditar={puedeEditar}
                 />
-              )}
-              {vistaSegura === "expedientes" && (
+              ) : null}
+              {vistaSegura === "expedientes" && !esEstudiante && (
                 <ExpedientesPage
                   key={busqueda}
                   busquedaInicial={busqueda}
@@ -340,13 +351,13 @@ export default function App() {
                   puedeEditar={puedeEditar}
                 />
               )}
-              {vistaSegura === "nuevo" && puedeEditar && (
+              {vistaSegura === "nuevo" && !esEstudiante && puedeEditar && (
                 <NuevoExpedientePage
                   alCancelar={volver}
                   alGuardar={abrir}
                 />
               )}
-              {vistaSegura === "editar" && puedeEditar && expedienteActual && (
+              {vistaSegura === "editar" && !esEstudiante && puedeEditar && expedienteActual && (
                 <NuevoExpedientePage
                   key={expedienteActual.id}
                   expediente={expedienteActual}

@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 // import.meta.env es la forma en que Vite entrega al código del navegador las
 // variables VITE_* del archivo .env. Este módulo es el único que crea Firebase.
@@ -35,6 +36,7 @@ const app = firebaseConfigurado
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
+export const functions = app ? getFunctions(app, "us-central1") : null;
 // El valor predeterminado reintenta hasta diez minutos y deja la barra en 0 %.
 // Un fallo de configuración o red debe volver pronto con un error visible.
 if (storage) storage.maxUploadRetryTime = 45_000;

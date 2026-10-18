@@ -7,16 +7,16 @@ export function mensajeErrorFirebase(error: unknown, accion: "guardar" | "audito
     ? String(error.statusCode)
     : "";
   if (estado === "401" || estado === "403") {
-    return "Supabase rechazó el acceso al PDF. Compruebe la integración Firebase Auth, las claims role/direccion y las políticas del bucket actas.";
+    return "Supabase rechazó el acceso al PDF. Compruebe la integración Firebase Auth, las claims role/actas y las políticas del bucket.";
   }
   if (estado === "404") {
     return "No se encontró el PDF o el bucket privado actas en Supabase.";
   }
   if (codigo.endsWith("/permission-denied") || codigo === "permission-denied" || codigo === "storage/unauthorized") {
     if (accion === "auditoria") {
-      return "No hay permiso para leer la auditoría. Compruebe que las reglas de expedientes/{id}/auditoria estén publicadas y que la cuenta tenga el rol direccion.";
+      return "No hay permiso para leer la auditoría. Compruebe que las reglas de expedientes/{id}/auditoria estén publicadas y que la cuenta tenga un rol autorizado.";
     }
-    return "La cuenta no tiene permiso. Compruebe el rol direccion y las reglas publicadas en Firebase.";
+    return "La cuenta no tiene permiso. Compruebe su rol y las reglas publicadas en Firebase.";
   }
   if (codigo === "functions/internal") {
     return "La función de guardado devolvió un error interno. Compruebe que esté desplegada en us-central1 y revise sus registros en Firebase.";

@@ -29,9 +29,12 @@ export async function tokenFirebaseParaActas(): Promise<string> {
   const usuario = auth?.currentUser;
   if (!usuario) throw new Error("La sesión venció. Vuelva a iniciar sesión.");
   const resultado = await usuario.getIdTokenResult(true);
-  if (resultado.claims.role !== "authenticated" || resultado.claims.direccion !== true) {
+  if (
+    resultado.claims.role !== "authenticated" ||
+    (resultado.claims.actas !== true && resultado.claims.direccion !== true)
+  ) {
     throw new Error(
-      "Esta cuenta aún no tiene el permiso de actas en Supabase. Un administrador debe sincronizar el rol direccion de Firebase.",
+      "Esta cuenta aún no tiene permiso para gestionar actas en Supabase. Un Administrador debe sincronizar las claims de Firebase.",
     );
   }
   return resultado.token;

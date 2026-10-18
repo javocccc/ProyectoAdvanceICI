@@ -10,7 +10,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { esRol, type Rol } from "../auth/roles";
+import { normalizarRol, type Rol } from "../auth/roles";
 import { auth } from "../services/firebase";
 import { db } from "../services/firebase";
 import { urlApp } from "../utils/rutas";
@@ -21,6 +21,7 @@ export interface UsuarioSesion {
   email: string;
   nombre: string;
   rol: Rol | null;
+  expedienteId?: string;
 }
 
 /** Las funciones y datos que cualquier pantalla puede obtener con useAuth(). */
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (guardado) {
         try {
           const sesion = JSON.parse(guardado) as UsuarioSesion;
-          setUsuario({ ...sesion, rol: "direccion" });
+          setUsuario({ ...sesion, rol: "administrador" });
         } catch {
           sessionStorage.removeItem(CLAVE_SESION_DEMO);
         }
@@ -94,14 +95,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!db) throw new Error("Firestore no está configurado.");
         const ficha = await getDoc(doc(db, "usuarios", cuenta.uid));
         if (!vigente || actual !== revision) return;
-        const rol = ficha.exists() && esRol(ficha.data().rol) ? ficha.data().rol as Rol : null;
+        const datosFicha = ficha.data();
+        const rol = ficha.exists() && datosFicha?.activo !== false
+          ? normalizarRol(datosFicha?.rol)
+          : null;
         setUsuario({
           id: cuenta.uid,
           email: cuenta.email ?? "",
           nombre: cuenta.displayName || cuenta.email?.split("@")[0] || "Usuario ICI",
           rol,
+          expedienteId: typeof datosFicha?.expedienteId === "string"
+            ? datosFicha.expedienteId
+            : undefined,
         });
-        setErrorPermiso(rol ? "" : "Esta cuenta no tiene un rol asignado. Solicite acceso al administrador.");
+        setErrorPermiso(
+          rol
+            ? ""
+            : datosFicha?.activo === false
+              ? "Esta cuenta está desactivada. Contacte al administrador."
+              : "Esta cuenta no tiene un rol asignado. Solicite acceso al administrador.",
+        );
       } catch {
         if (!vigente || actual !== revision) return;
         setUsuario({
@@ -139,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "Datos incorrectos. Use las credenciales de demostración indicadas.",
       );
     }
-    const demo: UsuarioSesion = { id: "direccion-demo", email, nombre: "Dirección ICI", rol: "direccion" };
+    const demo: UsuarioSesion = { id: "administrador-demo", email, nombre: "Administrador ICI", rol: "administrador" };
     sessionStorage.setItem(CLAVE_SESION_DEMO, JSON.stringify(demo));
     setUsuario(demo);
   }

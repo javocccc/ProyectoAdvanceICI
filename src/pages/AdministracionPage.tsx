@@ -8,6 +8,7 @@ import {
 } from "../services/sistema";
 import type { AccesoExpediente, EstadoSistema } from "../services/sistema";
 import { firebaseConfigurado } from "../services/firebase";
+import { CuentasPage } from "./CuentasPage";
 
 interface AdministracionPageProps {
   alCambiarEstado: (estado: EstadoSistema) => void;
@@ -66,7 +67,7 @@ export function AdministracionPage({ alCambiarEstado }: AdministracionPageProps)
       alCambiarEstado(guardado);
       setMensaje(guardado.mantenimiento ? "Modo mantenimiento activado." : "Modo mantenimiento desactivado.");
     } catch {
-      setError("No se pudo guardar el estado de mantenimiento. Compruebe que su cuenta tenga rol Dirección.");
+      setError("No se pudo guardar el estado de mantenimiento. Compruebe que su cuenta tenga rol Administrador.");
     } finally {
       setGuardando(false);
     }
@@ -87,7 +88,7 @@ export function AdministracionPage({ alCambiarEstado }: AdministracionPageProps)
 
       <section className="admin-card">
         <h2>Estado del sistema</h2>
-        <p>El mantenimiento bloquea el acceso de usuarios; Dirección conserva el acceso para desactivarlo.</p>
+        <p>El mantenimiento bloquea el acceso de estudiantes y coordinadores; Administración conserva el acceso para desactivarlo.</p>
         {!firebaseConfigurado && <p className="admin-note">En modo de demostración este ajuste se guarda en este navegador.</p>}
         <form className="maintenance-form" onSubmit={guardar}>
           <label className="checkline">
@@ -144,6 +145,7 @@ export function AdministracionPage({ alCambiarEstado }: AdministracionPageProps)
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {mensaje && <p className="form-success" role="status">{mensaje}</p>}
+      <CuentasPage />
     </section>
   );
 }

@@ -9,32 +9,39 @@ on conflict (id) do update
       allowed_mime_types = excluded.allowed_mime_types;
 
 -- Supabase verifica el JWT de Firebase antes de evaluar estas políticas.
--- La claim direccion la asigna el script functions/scripts/syncSupabaseClaims.mjs
--- únicamente a cuentas cuyo documento usuarios/<uid> tiene rol direccion.
-create policy "actas_direccion_leer"
+-- La claim actas la asigna el script functions/scripts/syncSupabaseClaims.mjs
+-- a Administradores y Coordinadores activos.
+drop policy if exists "actas_direccion_leer" on storage.objects;
+drop policy if exists "actas_direccion_subir" on storage.objects;
+drop policy if exists "actas_direccion_borrar" on storage.objects;
+drop policy if exists "actas_gestores_leer" on storage.objects;
+drop policy if exists "actas_gestores_subir" on storage.objects;
+drop policy if exists "actas_gestores_borrar" on storage.objects;
+
+create policy "actas_gestores_leer"
 on storage.objects for select to authenticated
 using (
   bucket_id = 'actas'
-  and auth.jwt()->>'direccion' = 'true'
+  and auth.jwt()->>'actas' = 'true'
   and auth.jwt()->>'iss' = 'https://securetoken.google.com/advanceici'
   and auth.jwt()->>'aud' = 'advanceici'
 );
 
-create policy "actas_direccion_subir"
+create policy "actas_gestores_subir"
 on storage.objects for insert to authenticated
 with check (
   bucket_id = 'actas'
-  and auth.jwt()->>'direccion' = 'true'
+  and auth.jwt()->>'actas' = 'true'
   and auth.jwt()->>'iss' = 'https://securetoken.google.com/advanceici'
   and auth.jwt()->>'aud' = 'advanceici'
   and lower(name) like '%.pdf'
 );
 
-create policy "actas_direccion_borrar"
+create policy "actas_gestores_borrar"
 on storage.objects for delete to authenticated
 using (
   bucket_id = 'actas'
-  and auth.jwt()->>'direccion' = 'true'
+  and auth.jwt()->>'actas' = 'true'
   and auth.jwt()->>'iss' = 'https://securetoken.google.com/advanceici'
   and auth.jwt()->>'aud' = 'advanceici'
 );

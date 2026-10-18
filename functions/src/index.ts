@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 import {
@@ -14,7 +15,49 @@ initializeApp();
 setGlobalOptions({ region: "us-central1" });
 
 const db = getFirestore();
+const authAdmin = getAuth();
 const ESTADOS_COLEGIATURA = ["al-dia", "no-al-dia", "sin-informar"] as const;
+const ROLES_APP = ["administrador", "coordinador", "estudiante"] as const;
+type RolApp = (typeof ROLES_APP)[number];
+
+function esRolApp(valor: unknown): valor is RolApp {
+  return typeof valor === "string" && ROLES_APP.includes(valor as RolApp);
+}
+
+function exigirRolApp(valor: unknown): RolApp {
+  if (!esRolApp(valor)) {
+    throw new HttpsError("invalid-argument", "El rol seleccionado no es válido.");
+  }
+  return valor;
+}
+
+async function exigirAdministrador(uid: string): Promise<void> {
+  const usuario = await db.collection("usuarios").doc(uid).get();
+  if (
+    usuario.data()?.activo === false ||
+    !["administrador", "direccion"].includes(String(usuario.data()?.rol))
+  ) {
+    throw new HttpsError("permission-denied", "Se requiere el rol de Administrador.");
+  }
+}
+
+async function actualizarClaimsActas(
+  usuario: Awaited<ReturnType<typeof authAdmin.getUser>>,
+  rol: RolApp,
+): Promise<void> {
+  const claims = { ...(usuario.customClaims ?? {}) };
+  const puedeGestionarActas = rol === "administrador" || rol === "coordinador";
+  if (puedeGestionarActas) {
+    claims.role = "authenticated";
+    claims.actas = true;
+  } else {
+    if (claims.role === "authenticated") delete claims.role;
+    delete claims.actas;
+  }
+  if (rol === "administrador") claims.direccion = true;
+  else delete claims.direccion;
+  await authAdmin.setCustomUserClaims(usuario.uid, claims);
+}
 
 interface Acta {
   nombre: string;
@@ -93,8 +136,11 @@ function validarActa(valor: unknown, expedienteId: string): Acta {
 
 async function exigirDireccion(uid: string): Promise<void> {
   const usuario = await db.collection("usuarios").doc(uid).get();
-  if (usuario.data()?.rol !== "direccion") {
-    throw new HttpsError("permission-denied", "Se requiere el rol de Dirección.");
+  if (
+    usuario.data()?.activo === false ||
+    !["administrador", "direccion"].includes(String(usuario.data()?.rol))
+  ) {
+    throw new HttpsError("permission-denied", "Se requiere el rol de Administrador.");
   }
 }
 
@@ -437,4 +483,234 @@ export const actualizarExpediente = onCall(async (request) => {
     return nuevosCambios;
   });
   return registrado;
+});
+
+export const listarCuentas = onCall(async (request) => {
+  const usuario = actor(request);
+  await exigirAdministrador(usuario.uid);
+  const cuentas = await db.collection("usuarios").get();
+  return {
+    cuentas: cuentas.docs.map((documento) => {
+      const datos = documento.data();
+      const rol = datos.rol === "direccion"
+        ? "administrador"
+        : datos.rol === "secretaria"
+          ? "coordinador"
+          : datos.rol === "consulta"
+            ? "estudiante"
+            : datos.rol;
+      return {
+        uid: documento.id,
+        email: typeof datos.email === "string" ? datos.email : "",
+        nombre: typeof datos.nombre === "string" ? datos.nombre : "",
+        rol: esRolApp(rol) ? rol : null,
+        activo: datos.activo !== false,
+        expedienteId: typeof datos.expedienteId === "string" ? datos.expedienteId : null,
+      };
+    }),
+  };
+});
+
+export const crearCuenta = onCall(async (request) => {
+  const solicitante = actor(request);
+  await exigirAdministrador(solicitante.uid);
+  const email = exigirTexto(request.data?.email, "correo", 254).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Ingrese un correo electrónico válido.");
+  }
+  const nombre = exigirTexto(request.data?.nombre, "nombre", 120);
+  const rol = exigirRolApp(request.data?.rol);
+  const expedienteId = request.data?.expedienteId === undefined
+    ? ""
+    : exigirTexto(request.data.expedienteId, "expediente", 100);
+  if (rol === "estudiante" && !expedienteId) {
+    throw new HttpsError("invalid-argument", "Debe vincular un expediente a cada cuenta de estudiante.");
+  }
+  if (rol !== "estudiante" && expedienteId) {
+    throw new HttpsError("invalid-argument", "Solo las cuentas de estudiante pueden vincularse a un expediente.");
+  }
+
+  let cuenta: Awaited<ReturnType<typeof authAdmin.createUser>>;
+  try {
+    cuenta = await authAdmin.createUser({ email, displayName: nombre });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "auth/email-already-exists"
+    ) {
+      throw new HttpsError("already-exists", "Ya existe una cuenta con ese correo.");
+    }
+    throw error;
+  }
+
+  try {
+    await actualizarClaimsActas(cuenta, rol);
+    const usuarioRef = db.collection("usuarios").doc(cuenta.uid);
+    const expedienteRef = expedienteId
+      ? db.collection("expedientes").doc(expedienteId)
+      : null;
+    await db.runTransaction(async (transaccion) => {
+      const usuarioActual = await transaccion.get(usuarioRef);
+      if (usuarioActual.exists) {
+        throw new HttpsError("already-exists", "La cuenta ya tiene un perfil asignado.");
+      }
+      const expediente = expedienteRef
+        ? await transaccion.get(expedienteRef)
+        : null;
+      if (expedienteRef && !expediente?.exists) {
+        throw new HttpsError("not-found", "No se encontró el expediente para vincular.");
+      }
+      if (expediente?.data()?.estudianteUid) {
+        throw new HttpsError("already-exists", "Ese expediente ya está vinculado a una cuenta de estudiante.");
+      }
+      transaccion.create(usuarioRef, {
+        email,
+        nombre,
+        rol,
+        activo: true,
+        ...(expedienteId ? { expedienteId } : {}),
+      });
+      if (expedienteRef) transaccion.update(expedienteRef, { estudianteUid: cuenta.uid });
+    });
+  } catch (error) {
+    try {
+      await authAdmin.deleteUser(cuenta.uid);
+    } catch {
+      throw new HttpsError(
+        "internal",
+        "No se pudo completar el perfil ni limpiar la cuenta autenticada. Revise Firebase Authentication.",
+      );
+    }
+    throw error;
+  }
+  return { uid: cuenta.uid, email, nombre, rol, activo: true, expedienteId: expedienteId || null };
+});
+
+export const actualizarCuenta = onCall(async (request) => {
+  const solicitante = actor(request);
+  await exigirAdministrador(solicitante.uid);
+  const uid = exigirTexto(request.data?.uid, "UID", 128);
+  const nombre = exigirTexto(request.data?.nombre, "nombre", 120);
+  const rol = exigirRolApp(request.data?.rol);
+  const expedienteId = request.data?.expedienteId === undefined
+    ? ""
+    : exigirTexto(request.data.expedienteId, "expediente", 100);
+  if (rol === "estudiante" && !expedienteId) {
+    throw new HttpsError("invalid-argument", "Debe vincular un expediente a cada cuenta de estudiante.");
+  }
+  if (rol !== "estudiante" && expedienteId) {
+    throw new HttpsError("invalid-argument", "Solo las cuentas de estudiante pueden vincularse a un expediente.");
+  }
+  if (uid === solicitante.uid && rol !== "administrador") {
+    throw new HttpsError("failed-precondition", "No puede quitarse su propio rol de Administrador.");
+  }
+
+  const authUser = await authAdmin.getUser(uid);
+  const usuarioRef = db.collection("usuarios").doc(uid);
+  await db.runTransaction(async (transaccion) => {
+    const usuarios = await transaccion.get(db.collection("usuarios"));
+    const perfil = usuarios.docs.find((documento) => documento.id === uid);
+    if (!perfil?.exists || perfil.data()?.activo === false) {
+      throw new HttpsError("not-found", "La cuenta no existe o está desactivada.");
+    }
+    const datosActuales = perfil.data() ?? {};
+    const rolAnterior = datosActuales.rol === "direccion" ? "administrador" : datosActuales.rol;
+    const administradoresActivos = usuarios.docs.filter((documento) => {
+      const datos = documento.data();
+      return datos.activo !== false && ["administrador", "direccion"].includes(String(datos.rol));
+    }).length;
+    if (rolAnterior === "administrador" && rol !== "administrador" && administradoresActivos <= 1) {
+      throw new HttpsError("failed-precondition", "Debe existir al menos un Administrador activo.");
+    }
+
+    const expedienteAnteriorId = typeof datosActuales.expedienteId === "string"
+      ? datosActuales.expedienteId
+      : "";
+    const refs = new Map<string, FirebaseFirestore.DocumentReference>();
+    for (const id of [expedienteAnteriorId, expedienteId]) {
+      if (id) refs.set(id, db.collection("expedientes").doc(id));
+    }
+    const expedientes = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+    for (const [id, ref] of refs) expedientes.set(id, await transaccion.get(ref));
+    const destino = expedienteId ? expedientes.get(expedienteId) : null;
+    if (expedienteId && !destino?.exists) {
+      throw new HttpsError("not-found", "No se encontró el expediente para vincular.");
+    }
+    if (
+      destino?.data()?.estudianteUid &&
+      destino.data()?.estudianteUid !== uid
+    ) {
+      throw new HttpsError("already-exists", "Ese expediente ya está vinculado a otra cuenta.");
+    }
+    const referenciaAnterior = refs.get(expedienteAnteriorId);
+    if (
+      referenciaAnterior &&
+      expedienteAnteriorId !== expedienteId &&
+      expedientes.get(expedienteAnteriorId)?.data()?.estudianteUid === uid
+    ) {
+      transaccion.update(referenciaAnterior, { estudianteUid: FieldValue.delete() });
+    }
+    const referenciaDestino = refs.get(expedienteId);
+    if (referenciaDestino) {
+      transaccion.update(referenciaDestino, { estudianteUid: uid });
+    }
+    transaccion.update(usuarioRef, {
+      nombre,
+      rol,
+      ...(expedienteId ? { expedienteId } : { expedienteId: FieldValue.delete() }),
+    });
+  });
+  if (authUser.displayName !== nombre) {
+    await authAdmin.updateUser(uid, { displayName: nombre });
+  }
+  await actualizarClaimsActas(authUser, rol);
+  return { uid, nombre, rol, expedienteId: expedienteId || null };
+});
+
+export const eliminarCuenta = onCall(async (request) => {
+  const solicitante = actor(request);
+  await exigirAdministrador(solicitante.uid);
+  const uid = exigirTexto(request.data?.uid, "UID", 128);
+  if (uid === solicitante.uid) {
+    throw new HttpsError("failed-precondition", "No puede eliminar su propia cuenta de Administrador.");
+  }
+  const usuarioRef = db.collection("usuarios").doc(uid);
+  await db.runTransaction(async (transaccion) => {
+    const usuarios = await transaccion.get(db.collection("usuarios"));
+    const perfil = usuarios.docs.find((documento) => documento.id === uid);
+    if (!perfil?.exists || perfil.data()?.activo === false) {
+      throw new HttpsError("not-found", "La cuenta no existe o ya está desactivada.");
+    }
+    const datos = perfil.data() ?? {};
+    const rol = datos.rol === "direccion" ? "administrador" : datos.rol;
+    const administradoresActivos = usuarios.docs.filter((documento) => {
+      const cuenta = documento.data();
+      return cuenta.activo !== false && ["administrador", "direccion"].includes(String(cuenta.rol));
+    }).length;
+    if (rol === "administrador" && administradoresActivos <= 1) {
+      throw new HttpsError("failed-precondition", "No se puede eliminar el último Administrador activo.");
+    }
+    const expedienteId = typeof datos.expedienteId === "string" ? datos.expedienteId : "";
+    const expedienteRef = expedienteId ? db.collection("expedientes").doc(expedienteId) : null;
+    const expediente = expedienteRef ? await transaccion.get(expedienteRef) : null;
+    if (expedienteRef && expediente?.data()?.estudianteUid === uid) {
+      transaccion.update(expedienteRef, { estudianteUid: FieldValue.delete() });
+    }
+    transaccion.update(usuarioRef, { activo: false, expedienteId: FieldValue.delete() });
+  });
+  try {
+    await authAdmin.deleteUser(uid);
+  } catch (error) {
+    if (
+      typeof error !== "object" ||
+      error === null ||
+      !("code" in error) ||
+      error.code !== "auth/user-not-found"
+    ) {
+      throw error;
+    }
+  }
+  return { uid, activo: false };
 });

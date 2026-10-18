@@ -30,10 +30,12 @@ try {
     .split("\n").map((linea) => linea.trim()).filter(Boolean).join("\n");
   console.log(`Reglas publicadas: ${release.updateTime}`);
   console.log(`Coinciden con firestore.rules: ${normalizar(remoto) === normalizar(local)}`);
-  const rolesActivos = /allow\s+get,\s*list:\s*if\s+puedeLeer\(\)/.test(remoto)
-    && /allow\s+create:\s*if\s+esDireccion\(\)\s*\|\|\s*\(esSecretaria\(\)/.test(remoto)
-    && /allow\s+update:\s*if\s+esDireccion\(\)\s*\|\|\s*\(esSecretaria\(\)/.test(remoto);
-  console.log(`Permisos Dirección/Secretaría/Consulta publicados: ${rolesActivos}`);
+  const rolesActivos = /function\s+esAdministrador\(\)[\s\S]*?administrador/.test(remoto)
+    && /function\s+esCoordinador\(\)[\s\S]*?coordinador/.test(remoto)
+    && /function\s+esEstudianteVinculado\(id\)[\s\S]*?estudianteUid/.test(remoto)
+    && /allow\s+get:\s*if\s+puedeLeerExpediente\(id\)/.test(remoto)
+    && /allow\s+list:\s*if\s+puedeLeer\(\)/.test(remoto);
+  console.log(`Permisos Administración/Coordinación/Estudiante publicados: ${rolesActivos}`);
   if (process.argv.includes("--show-permissions")) {
     console.log("Permisos publicados:");
     for (const linea of remoto.split(/\r?\n/).filter((valor) => /\ballow\b/.test(valor)))

@@ -7,40 +7,65 @@ service cloud.firestore {
         : get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
     }
 
+    function esAdministrador() {
+      return rolUsuario() in ['administrador', 'direccion']
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo != false;
+    }
+
+    function esCoordinador() {
+      return rolUsuario() in ['coordinador', 'secretaria']
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo != false;
+    }
+
+    function esEstudiante() {
+      return rolUsuario() in ['estudiante', 'consulta'];
+    }
+
     function puedeLeer() {
-      return rolUsuario() in ['direccion', 'secretaria', 'consulta'];
+      return esAdministrador() || esCoordinador();
     }
 
-    function esDireccion() {
-      return rolUsuario() == 'direccion';
+    function esEstudianteVinculado(id) {
+      return esEstudiante()
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo != false
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.expedienteId == id
+        && get(/databases/$(database)/documents/expedientes/$(id)).data.estudianteUid == request.auth.uid;
     }
 
-    function esSecretaria() {
-      return rolUsuario() == 'secretaria';
+    function puedeRegistrarConsulta(id) {
+      return puedeLeer() || esEstudianteVinculado(id);
     }
 
-    function creacionSecretaria() {
-      return request.resource.data.colegiatura == 'sin-informar'
+    function puedeLeerExpediente(id) {
+      return puedeLeer()
+        || (esEstudianteVinculado(id) && resource.data.estudianteUid == request.auth.uid);
+    }
+
+    function creacionCoordinador() {
+      return request.resource.data.keys().hasOnly([
+          'id', 'nombre', 'rut', 'anioEgreso', 'semestreEgreso', 'fechaExamen',
+          'notaExamen', 'comision', 'colegiatura', 'fechaCreacion', 'creadoPor',
+          'historialColegiatura', 'historialAuditoria'
+        ])
+        && request.resource.data.colegiatura == 'sin-informar'
         && !('acta' in request.resource.data)
         && !('fechaColegiatura' in request.resource.data)
         && request.resource.data.historialColegiatura == [];
     }
 
-    function edicionAcademicaSecretaria() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'nombre', 'rut', 'anioEgreso', 'semestreEgreso', 'fechaExamen',
-        'notaExamen', 'comision', 'historialAuditoria'
-      ]);
-    }
-
     match /expedientes/{id} {
-      allow get, list: if puedeLeer();
-      allow create: if esDireccion() || (esSecretaria() && creacionSecretaria());
-      allow update: if esDireccion() || (esSecretaria() && edicionAcademicaSecretaria());
+      allow get: if puedeLeerExpediente(id);
+      allow list: if puedeLeer();
+      allow create: if esAdministrador() || (esCoordinador() && creacionCoordinador());
+      allow update: if esAdministrador()
+        || (esCoordinador() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nombre', 'rut', 'anioEgreso', 'semestreEgreso', 'fechaExamen',
+          'notaExamen', 'comision', 'acta', 'historialAuditoria'
+        ]));
       allow delete: if false;
 
       match /auditoria/{registroId} {
-        allow get, list: if puedeLeer();
+        allow get, list: if puedeLeer() || esEstudianteVinculado(id);
         allow create, update, delete: if false;
       }
     }
@@ -53,7 +78,7 @@ service cloud.firestore {
     match /configuracion/sistema {
       allow get: if true;
       allow list: if false;
-      allow create, update: if esDireccion()
+      allow create, update: if esAdministrador()
         && request.resource.data.keys().hasOnly([
           'mantenimiento', 'mensaje', 'actualizadoEn', 'actualizadoPor'
         ])
@@ -65,8 +90,8 @@ service cloud.firestore {
     }
 
     match /consultasExpedientes/{consultaId} {
-      allow get, list: if esDireccion();
-      allow create: if puedeLeer()
+      allow get, list: if esAdministrador();
+      allow create: if puedeRegistrarConsulta(request.resource.data.expedienteId)
         && request.resource.data.keys().hasOnly([
           'fecha', 'usuario', 'usuarioId', 'expedienteId', 'accion'
         ])
