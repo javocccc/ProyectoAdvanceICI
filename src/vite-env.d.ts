@@ -3,6 +3,7 @@
 // Describe las variables de .env para que TypeScript detecte nombres mal
 // escritos. El signo ? indica que pueden faltar en modo demostración.
 interface ImportMetaEnv {
+  readonly VITE_APP_VERSION?: string;
   readonly VITE_FIREBASE_API_KEY?: string;
   readonly VITE_FIREBASE_AUTH_DOMAIN?: string;
   readonly VITE_FIREBASE_PROJECT_ID?: string;

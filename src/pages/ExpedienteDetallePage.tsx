@@ -11,7 +11,7 @@ import {
   urlActa,
   validarActa,
 } from "../services/actas";
-import { actualizarExpediente } from "../services/expedientes";
+import { actualizarExpediente, listarAuditoriaExpediente } from "../services/expedientes";
 
 import type {
   Expediente,
@@ -76,6 +76,8 @@ export function ExpedienteDetallePage({
   const [progreso, setProgreso] = useState(0);
   const [errorActa, setErrorActa] = useState("");
   const [mensajeActa, setMensajeActa] = useState("");
+  const [exportando, setExportando] = useState(false);
+  const [errorExportacion, setErrorExportacion] = useState("");
   // useRef conserva valores entre renders sin causar otro render. La URL
   // temporal del PDF demo desaparece al cerrar o cambiar de ficha.
   const demoUrl = useRef<string | null>(null);
@@ -321,6 +323,43 @@ export function ExpedienteDetallePage({
     }
   }
 
+  async function exportarExpediente() {
+    if (exportando) return;
+    setExportando(true);
+    setErrorExportacion("");
+    try {
+      const historialAuditoria = await listarAuditoriaExpediente(actual.id);
+      const exportacion = {
+        formato: "Advance ICI - exportación de expediente",
+        exportadoEn: new Date().toISOString(),
+        expediente: {
+          id: actual.id,
+          nombre: actual.nombre,
+          rut: actual.rut,
+          anioEgreso: actual.anioEgreso,
+          semestreEgreso: actual.semestreEgreso,
+          fechaExamen: actual.fechaExamen,
+          notaExamen: actual.notaExamen ?? null,
+          comision: actual.comision ?? null,
+          colegiatura: actual.colegiatura,
+          fechaColegiatura: actual.fechaColegiatura ?? null,
+          fechaCreacion: actual.fechaCreacion,
+          creadoPor: actual.creadoPor,
+          historialColegiatura: actual.historialColegiatura,
+          acta: actual.acta ?? null,
+          historialAuditoria,
+        },
+        nota: "Los archivos PDF no están incluidos en este JSON; deben descargarse por separado desde la ficha si la cuenta tiene permiso.",
+      };
+      const blob = new Blob([JSON.stringify(exportacion, null, 2)], { type: "application/json;charset=utf-8" });
+      descargarBlob(blob, `expediente-${actual.id}.json`);
+    } catch {
+      setErrorExportacion("No se pudo exportar el expediente y su historial. Intente nuevamente.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
   return (
     <>
       <button className="back-link" type="button" onClick={alVolver}>
@@ -336,6 +375,9 @@ export function ExpedienteDetallePage({
         </div>
         <div className="detail-heading-actions">
           <EstadoBadge estado={actual.colegiatura} />
+          <button className="button button-secondary" type="button" onClick={() => void exportarExpediente()} disabled={exportando}>
+            {exportando ? "Preparando exportación…" : "Exportar datos"}
+          </button>
           {puedeEditar && <button
             className="button button-secondary"
             type="button"
@@ -345,6 +387,7 @@ export function ExpedienteDetallePage({
           </button>}
         </div>
       </div>
+      {errorExportacion && <p className="form-error" role="alert">{errorExportacion}</p>}
       <div className="detail-grid ficha-grid">
         <section className="detail-section">
           <h2>Datos académicos</h2>

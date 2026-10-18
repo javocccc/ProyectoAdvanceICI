@@ -4,17 +4,21 @@ import { Icon } from "../components/Icon";
 import logoUcen from "../../logoucen.jpg";
 import { useAuth } from "../context/AuthContext";
 import { firebaseConfigurado } from "../services/firebase";
+import { urlApp } from "../utils/rutas";
+import { versionAplicacion } from "../utils/version";
 
 /** Muestra el formulario de acceso; la verificación real vive en AuthContext. */
 export function LoginPage() {
   // useAuth obtiene ingresar() del proveedor que envuelve la aplicación.
-  const { ingresar } = useAuth();
+  const { ingresar, recuperarClave } = useAuth();
   // Cada cambio en los campos actualiza el estado y React vuelve a dibujarlos.
   const [email, setEmail] = useState("");
   const [clave, setClave] = useState("");
   const [recordar, setRecordar] = useState(false);
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
 
   /** Evita el envío normal del navegador y espera el resultado del ingreso. */
   async function manejarIngreso(evento: FormEvent<HTMLFormElement>) {
@@ -32,6 +36,26 @@ export function LoginPage() {
           : problema instanceof Error
             ? problema.message
             : "Ocurrió un error al ingresar.",
+      );
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function manejarRecuperacion(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError("");
+    setMensaje("");
+    setEnviando(true);
+    try {
+      await recuperarClave(email.trim());
+      setMensaje("Si existe una cuenta asociada a ese correo, recibirá instrucciones para restablecer su contraseña.");
+    } catch (problema) {
+      const codigo = (problema as { code?: string }).code;
+      setError(
+        codigo === "auth/invalid-email"
+          ? "Ingrese un correo electrónico válido."
+          : "No se pudo enviar el correo de recuperación. Intente nuevamente o contacte a soporte.",
       );
     } finally {
       setEnviando(false);
@@ -72,8 +96,8 @@ export function LoginPage() {
           </div>
           <div className="login-panel-heading">
             <span className="small-rule" />
-            <h2 id="login-title">Bienvenido de vuelta</h2>
-            <p>Ingrese para continuar con los expedientes de titulación.</p>
+            <h2 id="login-title">{recuperando ? "Restablecer contraseña" : "Bienvenido de vuelta"}</h2>
+            <p>{recuperando ? "Le enviaremos un enlace al correo asociado a su cuenta." : "Ingrese para continuar con los expedientes de titulación."}</p>
           </div>
 
           {!firebaseConfigurado && (
@@ -87,53 +111,117 @@ export function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={manejarIngreso} className="login-form">
-            <label htmlFor="email">Correo electrónico</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="nombre@universidad.cl"
-            />
-            <label htmlFor="password">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={clave}
-              onChange={(e) => setClave(e.target.value)}
-              placeholder="Ingrese su contraseña"
-            />
-            {firebaseConfigurado && (
-              <label className="checkline">
-                <input
-                  type="checkbox"
-                  checked={recordar}
-                  onChange={(e) => setRecordar(e.target.checked)}
-                />{" "}
-                Mantener sesión iniciada
-              </label>
-            )}
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <button
-              className="button button-primary login-submit"
-              type="submit"
-              disabled={enviando}
-            >
-              {enviando ? "Ingresando…" : "Ingresar al sistema"}{" "}
-              <Icon name="arrow" size={19} />
-            </button>
-          </form>
+          {recuperando ? (
+            <form onSubmit={manejarRecuperacion} className="login-form">
+              <label htmlFor="recovery-email">Correo electrónico</label>
+              <input
+                id="recovery-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="nombre@universidad.cl"
+              />
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+              {mensaje && (
+                <p className="form-success" role="status">
+                  {mensaje}
+                </p>
+              )}
+              <button
+                className="button button-primary login-submit"
+                type="submit"
+                disabled={enviando}
+              >
+                {enviando ? "Enviando…" : "Enviar instrucciones"}
+              </button>
+              <button
+                className="inline-action"
+                type="button"
+                onClick={() => {
+                  setRecuperando(false);
+                  setError("");
+                  setMensaje("");
+                }}
+              >
+                Volver al inicio de sesión
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={manejarIngreso} className="login-form">
+              <label htmlFor="email">Correo electrónico</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="nombre@universidad.cl"
+              />
+              <label htmlFor="password">Contraseña</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                placeholder="Ingrese su contraseña"
+              />
+              {firebaseConfigurado && (
+                <label className="checkline">
+                  <input
+                    type="checkbox"
+                    checked={recordar}
+                    onChange={(e) => setRecordar(e.target.checked)}
+                  />{" "}
+                  Mantener sesión iniciada
+                </label>
+              )}
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button
+                className="button button-primary login-submit"
+                type="submit"
+                disabled={enviando}
+              >
+                {enviando ? "Ingresando…" : "Ingresar al sistema"}{" "}
+                <Icon name="arrow" size={19} />
+              </button>
+              {firebaseConfigurado && (
+                <button
+                  className="inline-action recovery-link"
+                  type="button"
+                  onClick={() => {
+                    setRecuperando(true);
+                    setError("");
+                  }}
+                >
+                  ¿Olvidó su contraseña?
+                </button>
+              )}
+            </form>
+          )}
           <p className="login-help">
-            Acceso para usuarios autorizados de Advance ICI.
+            Acceso para usuarios autorizados de Advance ICI.{" "}
+            <a href={urlApp("ayuda")}>Ayuda y soporte</a>
+            <span aria-hidden="true"> · </span>
+            <a href={urlApp("privacidad")}>Privacidad</a>
+            <span aria-hidden="true"> · </span>
+            <a href={urlApp("terminos")}>Términos</a>
+            <span aria-hidden="true"> · </span>
+            <a href={urlApp("estado")}>Estado</a>
+            <br />
+            Universidad Central de Chile · Versión {versionAplicacion} · Contacto institucional: pendiente de confirmar
           </p>
         </div>
       </section>

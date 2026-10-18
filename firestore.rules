@@ -49,5 +49,37 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false; // Crear este documento manualmente en la consola Firebase.
     }
+
+    match /configuracion/sistema {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if esDireccion()
+        && request.resource.data.keys().hasOnly([
+          'mantenimiento', 'mensaje', 'actualizadoEn', 'actualizadoPor'
+        ])
+        && request.resource.data.mantenimiento is bool
+        && request.resource.data.mensaje is string
+        && request.resource.data.actualizadoEn is string
+        && request.resource.data.actualizadoPor == request.auth.token.email;
+      allow delete: if false;
+    }
+
+    match /consultasExpedientes/{consultaId} {
+      allow get, list: if esDireccion();
+      allow create: if puedeLeer()
+        && request.resource.data.keys().hasOnly([
+          'fecha', 'usuario', 'usuarioId', 'expedienteId', 'accion'
+        ])
+        && request.resource.data.keys().hasAll([
+          'fecha', 'usuario', 'usuarioId', 'expedienteId', 'accion'
+        ])
+        && request.resource.data.fecha == request.time
+        && request.resource.data.usuario == request.auth.token.email
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.expedienteId is string
+        && request.resource.data.accion == 'Consulta de expediente'
+        && exists(/databases/$(database)/documents/expedientes/$(request.resource.data.expedienteId));
+      allow update, delete: if false;
+    }
   }
 }

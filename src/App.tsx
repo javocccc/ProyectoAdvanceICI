@@ -11,19 +11,50 @@ import { ExpedientesPage } from "./pages/ExpedientesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NuevoExpedientePage } from "./pages/NuevoExpedientePage";
 import { PanelPage } from "./pages/PanelPage";
+import { AdministracionPage } from "./pages/AdministracionPage";
+import { PublicPage } from "./pages/PublicPage";
+import type { PublicPageKind } from "./pages/PublicPage";
 import logoUcen from "../logoucen.jpg";
+import { obtenerEstadoSistema, registrarConsultaExpediente } from "./services/sistema";
+import type { EstadoSistema } from "./services/sistema";
+import { urlApp } from "./utils/rutas";
+import { versionAplicacion } from "./utils/version";
 
 // La navegación es local a esta pestaña: cambiar de vista no cambia la URL.
-type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle";
+type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle" | "administracion";
+
+const paginasPublicas: Record<string, PublicPageKind> = {
+  "/privacidad": "privacidad",
+  "/terminos": "terminos",
+  "/ayuda": "ayuda",
+  "/estado": "estado",
+  "/403": "403",
+  "/404": "404",
+  "/sesion-expirada": "sesion-expirada",
+};
 
 export default function App() {
   // useAuth lee el valor que AuthProvider publicó desde main.tsx.
   const { usuario, cargando, errorPermiso, salir } = useAuth();
   const puedeEditar = tienePermiso(usuario?.rol ?? null, "editarExpedientes");
+  const puedeAdministrar = usuario?.rol === "direccion";
+  const baseUrl = import.meta.env.BASE_URL;
+  const baseSinBarra = baseUrl.replace(/\/+$/, "");
+  const rutaNavegador = typeof window === "undefined" ? baseUrl : window.location.pathname;
+  const rutaDirecta = rutaNavegador === baseSinBarra
+    ? "/"
+    : rutaNavegador.startsWith(`${baseSinBarra}/`)
+      ? rutaNavegador.slice(baseSinBarra.length)
+      : rutaNavegador;
+  const paginaSolicitada = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("page");
+  const ruta = paginaSolicitada ? `/${paginaSolicitada}` : rutaDirecta.replace(/\/+$/, "") || "/";
+  const enInicio = rutaDirecta.replace(/\/+$/, "") === "" || rutaDirecta === "/";
+  const paginaPublica = paginasPublicas[ruta];
   // App conserva la navegación y la ficha seleccionada; los listados consultan
   // sus páginas directamente al servicio de datos.
   const [vista, setVista] = useState<Vista>("panel");
-  const vistaSegura = !puedeEditar && (vista === "nuevo" || vista === "editar") ? "panel" : vista;
   const [historial, setHistorial] = useState<Vista[]>([]);
   const [expedienteActual, setExpedienteActual] =
     useState<Expediente | null>(null);
@@ -32,6 +63,20 @@ export default function App() {
   const [cargandoExpediente, setCargandoExpediente] = useState(false);
   const [errorDatos, setErrorDatos] = useState("");
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [estadoSistema, setEstadoSistema] = useState<EstadoSistema | null>(null);
+  const [cargandoEstado, setCargandoEstado] = useState(typeof window !== "undefined");
+  const [errorEstado, setErrorEstado] = useState("");
+  const vistaSegura = !puedeEditar && (vista === "nuevo" || vista === "editar")
+    || !puedeAdministrar && vista === "administracion"
+    ? "panel"
+    : vista;
+
+  useEffect(() => {
+    obtenerEstadoSistema()
+      .then(setEstadoSistema)
+      .catch(() => setErrorEstado("No se pudo verificar si el sistema está en mantenimiento."))
+      .finally(() => setCargandoEstado(false));
+  }, []);
 
   // Las fichas se cargan individualmente al abrir o editar, nunca descargando
   // la colección completa desde App.
@@ -48,6 +93,12 @@ export default function App() {
           setErrorDatos(
             expediente ? "" : "No se encontró el expediente solicitado.",
           );
+          if (expediente && vistaSegura === "detalle" && usuario) {
+            registrarConsultaExpediente(expediente.id, usuario.id, usuario.email)
+              .catch(() => {
+                if (vigente) setErrorDatos("El expediente se abrió, pero no se pudo registrar la consulta en la auditoría.");
+              });
+          }
         }
       })
       .catch((problema: unknown) => {
@@ -69,6 +120,7 @@ export default function App() {
   /** Cambia la pantalla visible y cierra el menú móvil. */
   function navegar(destino: Vista) {
     if (!puedeEditar && (destino === "nuevo" || destino === "editar")) return;
+    if (!puedeAdministrar && destino === "administracion") return;
     if (destino !== vista)
       setHistorial((anterior) => [...anterior, vista]);
     setVista(destino);
@@ -103,6 +155,22 @@ export default function App() {
     setBusqueda(texto);
     navegar("expedientes");
   }
+  if (paginaPublica) return <PublicPage kind={paginaPublica} />;
+  if (!enInicio && !paginaPublica) return <PublicPage kind="404" />;
+  if (paginaSolicitada && !paginaPublica) return <PublicPage kind="404" />;
+  if (cargandoEstado) return <div className="startup-loading">Verificando estado del sistema…</div>;
+  if (errorEstado) return (
+    <main className="startup-loading" role="alert">
+      <div>
+        <h1>No se pudo verificar el estado</h1>
+        <p>{errorEstado}</p>
+        <button className="button button-secondary" type="button" onClick={() => window.location.reload()}>
+          Reintentar
+        </button>
+      </div>
+    </main>
+  );
+  if (estadoSistema?.mantenimiento && !puedeAdministrar) return <PublicPage kind="estado" />;
   // Primero se resuelve la sesión; después se decide entre login y aplicación.
   if (cargando)
     return <div className="startup-loading">Cargando Advance ICI…</div>;
@@ -115,6 +183,7 @@ export default function App() {
         <button className="button button-secondary" type="button" onClick={() => void salir()}>
           Cerrar sesión
         </button>
+        <a className="button button-secondary" href={urlApp("ayuda")}>Ayuda y soporte</a>
       </div>
     </main>
   );
@@ -159,6 +228,13 @@ export default function App() {
             onClick={() => navegar("nuevo")}
           >
             <Icon name="plus" /> Nuevo expediente
+          </button>}
+          {puedeAdministrar && <button
+            type="button"
+            className={vistaSegura === "administracion" ? "active" : ""}
+            onClick={() => navegar("administracion")}
+          >
+            <Icon name="settings" /> Control y auditoría
           </button>}
         </nav>
         <div className="sidebar-bottom">
@@ -218,7 +294,9 @@ export default function App() {
                   ? "Nuevo expediente"
                   : vistaSegura === "editar"
                     ? "Editar expediente"
-                  : "Expedientes"}
+                    : vistaSegura === "administracion"
+                      ? "Control y auditoría"
+                      : "Expedientes"}
             </strong>
           </div>
           <div className="topbar-right">
@@ -280,12 +358,20 @@ export default function App() {
                   alEditar={() => editar(expedienteActual.id)}
                 />
               )}
+              {vistaSegura === "administracion" && puedeAdministrar && (
+                <AdministracionPage alCambiarEstado={setEstadoSistema} />
+              )}
             </>
           )}
         </main>
         <footer className="app-footer">
-          <span>Advance ICI · Proyecto académico</span>
-          <span>Universidad Central de Chile</span>
+          <span>Advance ICI · Universidad Central de Chile · Versión {versionAplicacion} · Contacto: pendiente de confirmar</span>
+          <nav aria-label="Información del sistema">
+            <a href={urlApp("privacidad")}>Privacidad</a>
+            <a href={urlApp("terminos")}>Términos</a>
+            <a href={urlApp("ayuda")}>Ayuda</a>
+            <a href={urlApp("estado")}>Estado</a>
+          </nav>
         </footer>
       </div>
     </div>

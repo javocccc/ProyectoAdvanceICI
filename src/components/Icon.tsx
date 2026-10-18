@@ -15,7 +15,8 @@ interface IconProps {
     | "clock"
     | "arrow"
     | "user"
-    | "edit";
+    | "edit"
+    | "settings";
   size?: number;
 }
 
@@ -94,6 +95,12 @@ export function Icon({ name, size = 20 }: IconProps) {
       <>
         <path d="m15 5 4 4M4 20l4.2-.8L19 8.4 15.6 5 4.8 15.8z" />
         <path d="M13.5 6.5 17.5 10.5" />
+      </>
+    ),
+    settings: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a8 8 0 0 1-1.7 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.7-1l-1.7.7-1.4-2.4 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.7a8 8 0 0 1 1.7-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.7 1l1.7-.7 1.4 2.4-1.4 1.1a7 7 0 0 1 0 2Z" />
       </>
     ),
   };

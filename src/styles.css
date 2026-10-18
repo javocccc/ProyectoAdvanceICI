@@ -1499,3 +1499,225 @@ select {
     animation: none !important;
   }
 }
+
+.login-help a,
+.app-footer a,
+.public-content a,
+.public-footer a {
+  color: var(--blue);
+  font-weight: 700;
+}
+.recovery-link {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.form-success {
+  color: #126f54;
+  background: #edf8f3;
+  border: 1px solid #b9e2d1;
+  padding: 11px 13px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+.app-footer nav,
+.public-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.app-footer a,
+.public-footer a {
+  text-decoration: none;
+}
+.app-footer a:hover,
+.public-footer a:hover {
+  text-decoration: underline;
+}
+.public-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+.public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px clamp(20px, 6vw, 84px);
+  background: white;
+  border-bottom: 1px solid var(--line);
+}
+.public-brand {
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+.public-brand strong {
+  color: var(--orange);
+}
+.public-content {
+  width: min(calc(100% - 40px), 900px);
+  margin: 56px auto;
+  padding: clamp(24px, 5vw, 56px);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 14px 40px #102b610d;
+  flex: 1;
+}
+.public-content h1 {
+  color: var(--navy);
+  font-size: clamp(32px, 5vw, 46px);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  margin: 0 0 24px;
+}
+.public-content h2 {
+  color: var(--navy);
+  font-size: 19px;
+  margin: 30px 0 8px;
+}
+.public-content p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+.draft-notice,
+.admin-note {
+  padding: 14px 16px;
+  border: 1px solid #efd49b;
+  border-radius: 9px;
+  background: #fff8e9;
+  color: #785014 !important;
+}
+.help-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 25px;
+}
+.help-cards section,
+.admin-card {
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.help-cards h2,
+.admin-card h2 {
+  color: var(--navy);
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.help-cards p,
+.admin-card p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+.public-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px clamp(20px, 6vw, 84px);
+  background: white;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.status-indicator {
+  width: fit-content;
+  padding: 9px 13px;
+  border-radius: 99px;
+  font-weight: 800;
+}
+.status-operational {
+  color: #126f54 !important;
+  background: #edf8f3;
+}
+.status-maintenance {
+  color: #785014 !important;
+  background: #fff4d9;
+}
+.admin-page > .page-heading {
+  align-items: center;
+}
+.admin-card {
+  margin: 0 0 20px;
+  box-shadow: 0 8px 24px #102b6108;
+}
+.admin-note {
+  display: inline-block;
+  margin: 16px 0 0 !important;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+.maintenance-form {
+  display: grid;
+  justify-items: start;
+  gap: 13px;
+  margin-top: 20px;
+}
+.maintenance-form > label:not(.checkline) {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+.maintenance-form textarea {
+  width: min(100%, 680px);
+  padding: 12px 14px;
+  border: 1px solid #cfd8e5;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+.maintenance-form small {
+  color: var(--muted);
+}
+.access-table-wrap {
+  overflow-x: auto;
+  margin-top: 18px;
+}
+.access-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.access-table-wrap th,
+.access-table-wrap td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.access-table-wrap th {
+  color: var(--muted);
+  font-weight: 700;
+}
+.access-table-wrap code {
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .public-header {
+    padding: 16px 18px;
+  }
+  .public-content {
+    margin: 24px auto;
+  }
+  .public-footer {
+    flex-direction: column;
+    padding: 17px 20px;
+  }
+  .help-cards {
+    grid-template-columns: 1fr;
+  }
+  .app-footer nav {
+    gap: 8px 14px;
+  }
+  .admin-page > .page-heading {
+    align-items: flex-start;
+  }
+}

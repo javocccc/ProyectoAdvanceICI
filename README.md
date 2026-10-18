@@ -80,6 +80,11 @@ reales ni como mecanismo de autenticación de producción.
 7. Instala dependencias con `npm install`. El directorio `functions/` conserva
    una implementación anterior; la aplicación actual no lo llama ni lo despliega.
 
+La opción de recuperación de contraseña envía el enlace con Firebase
+Authentication. Configura y prueba la plantilla de correo de restablecimiento
+y autoriza el dominio del despliegue en Authentication. El flujo no está
+disponible en el modo de demostración.
+
 ## Configuración de Supabase para actas
 
 1. Crea un proyecto Supabase. En **Authentication → Third-Party Auth**, agrega
@@ -154,6 +159,39 @@ npm run build
 
 La compilación del frontend debe usar el `.env` del mismo proyecto. El hosting
 se publica por separado; `firebase.json` aún no configura Firebase Hosting.
+
+## Páginas públicas, auditoría y mantenimiento
+
+- Las páginas de privacidad, términos, ayuda y estado están disponibles desde
+  el inicio de sesión y usan parámetros de consulta para funcionar también en
+  GitHub Pages. Los textos legales son borradores pendientes de aprobación;
+  reemplázalos por los textos institucionales definitivos antes de producción.
+  El correo de soporte y el canal de privacidad también están pendientes de
+  definición.
+- Las fichas ofrecen una exportación JSON con los datos del expediente y su
+  historial de cambios. El PDF del acta es un archivo separado y debe
+  descargarse aparte, según los permisos actuales de la cuenta.
+- Dirección cuenta con la pantalla **Control y auditoría**. El registro agrega
+  una entrada al abrir una ficha desde la aplicación y muestra usuario,
+  identificador, fecha de servidor y acción, sin duplicar nombre ni RUT. Las
+  reglas permiten crear entradas solo para el usuario autenticado, con hora
+  de servidor, y prohíben editarlas o borrarlas; la consulta queda restringida
+  a Dirección. Como el evento se registra desde el navegador, una persona
+  autorizada podría fabricar entradas propias. No es una auditoría forense de
+  todas las lecturas: no registra las filas mostradas por listados ni lecturas
+  hechas fuera de la interfaz.
+- Dirección puede activar o desactivar mantenimiento desde esa misma pantalla.
+  Solo el estado y el mensaje de mantenimiento se pueden leer sin iniciar
+  sesión; su edición está protegida por rol. El modo demo conserva estas
+  opciones y sus registros localmente en el navegador.
+- Las rutas públicas usan `?page=` para evitar depender de una regla de
+  fallback del proveedor estático; el build genera además `404.html` para
+  mostrar la pantalla propia al visitar una ruta inexistente. El estado de
+  mantenimiento se vuelve a consultar al cargar la aplicación.
+
+Después de incorporar estas reglas, publica `firestore.rules` en el proyecto
+Firebase antes de probar la administración y la auditoría. Las páginas legales
+deben considerarse informativas hasta la validación institucional.
 
 ## Almacenamiento y permisos
 

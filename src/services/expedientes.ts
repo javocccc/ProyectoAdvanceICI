@@ -202,7 +202,7 @@ export async function obtenerResumenExpedientes(): Promise<ResumenExpedientes> {
   };
 }
 
-/** Lee el historial guardado en el mismo expediente. */
+/** Lee historiales actuales embebidos y registros de implementaciones anteriores en subcolección. */
 export async function listarAuditoriaExpediente(
   id: string,
 ): Promise<RegistroAuditoria[]> {
@@ -212,10 +212,21 @@ export async function listarAuditoriaExpediente(
         ?.historialAuditoria ?? []
     ).slice(-50).reverse();
   }
-  const expediente = await getDoc(doc(db, "expedientes", id));
-  return ((expediente.data() as Expediente | undefined)?.historialAuditoria ?? [])
-    .slice(-50)
-    .reverse();
+  const [expediente, respuesta] = await Promise.all([
+    getDoc(doc(db, "expedientes", id)),
+    getDocs(query(
+      collection(db, "expedientes", id, "auditoria"),
+      orderBy("fecha", "desc"),
+    )),
+  ]);
+  const embebidos = (expediente.data() as Expediente | undefined)?.historialAuditoria ?? [];
+  const subcoleccion = respuesta.docs.map((item) => ({
+    id: item.id,
+    ...item.data(),
+  }) as RegistroAuditoria);
+  return [...embebidos, ...subcoleccion].sort((a, b) =>
+    b.fecha.localeCompare(a.fecha),
+  );
 }
 
 /** Crea una ficha y rechaza un RUT ya presente tras quitar su puntuación. */

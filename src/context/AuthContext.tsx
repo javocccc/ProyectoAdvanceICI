@@ -4,6 +4,7 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
@@ -12,6 +13,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { esRol, type Rol } from "../auth/roles";
 import { auth } from "../services/firebase";
 import { db } from "../services/firebase";
+import { urlApp } from "../utils/rutas";
 
 /** Datos mínimos que necesita la interfaz. Nunca guardamos la contraseña. */
 export interface UsuarioSesion {
@@ -27,10 +29,12 @@ interface ValorAuthContext {
   cargando: boolean;
   errorPermiso: string;
   ingresar: (email: string, clave: string, recordar: boolean) => Promise<void>;
+  recuperarClave: (email: string) => Promise<void>;
   salir: () => Promise<void>;
 }
 
 const CLAVE_SESION_DEMO = "advance-ici-sesion-demo";
+const CLAVE_SESION_AUTENTICADA = "advance-ici-sesion-autenticada";
 
 // 1. createContext define qué datos se pueden compartir.
 // 2. AuthProvider coloca esos datos alrededor de App en main.tsx.
@@ -72,12 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const actual = ++revision;
       if (!cuenta) {
         if (vigente) {
+          if (sessionStorage.getItem(CLAVE_SESION_AUTENTICADA) === "true") {
+            sessionStorage.removeItem(CLAVE_SESION_AUTENTICADA);
+            window.location.replace(urlApp("sesion-expirada"));
+            return;
+          }
           setUsuario(null);
           setErrorPermiso("");
           setCargando(false);
         }
         return;
       }
+      sessionStorage.setItem(CLAVE_SESION_AUTENTICADA, "true");
       setCargando(true);
       setUsuario(null);
       try {
@@ -134,8 +144,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(demo);
   }
 
+  async function recuperarClave(email: string) {
+    if (!auth) {
+      throw new Error("La recuperación de contraseña requiere que Firebase esté configurado.");
+    }
+    await sendPasswordResetEmail(auth, email);
+  }
+
   /** Cierra la sesión y hace que App vuelva a mostrar LoginPage. */
   async function salir() {
+    sessionStorage.removeItem(CLAVE_SESION_AUTENTICADA);
     if (auth) await signOut(auth);
     sessionStorage.removeItem(CLAVE_SESION_DEMO);
     setUsuario(null);
@@ -145,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Cuando cambia usuario, React vuelve a renderizar los consumidores de
   // useAuth(), como App y el formulario de ingreso.
   return (
-    <AuthContext.Provider value={{ usuario, cargando, errorPermiso, ingresar, salir }}>
+    <AuthContext.Provider value={{ usuario, cargando, errorPermiso, ingresar, recuperarClave, salir }}>
       {children}
     </AuthContext.Provider>
   );
