@@ -18,8 +18,14 @@ export const bucketActas = "actas";
 
 export function exigirSupabase() {
   if (!supabase) {
+    const faltantes = [
+      !url && "VITE_SUPABASE_URL",
+      !clave && "VITE_SUPABASE_PUBLISHABLE_KEY",
+    ].filter(Boolean);
     throw new Error(
-      "Falta configurar VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY para subir actas.",
+      firebaseAuth
+        ? `Falta configurar ${faltantes.join(" y ")}. Agréguelos a .env.development para desarrollo local o a las variables de GitHub Actions para el sitio publicado; luego reinicie o vuelva a desplegar la aplicación.`
+        : "Supabase requiere Firebase configurado. Complete primero las variables VITE_FIREBASE_*.",
     );
   }
   return supabase;

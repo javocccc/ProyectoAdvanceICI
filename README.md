@@ -21,7 +21,8 @@ npm run dev
 ```
 
 La app inicia en modo demostración mientras la configuración web de Firebase
-no esté completa. Usa datos guardados en el `localStorage` de ese navegador;
+no esté completa. Usa datos guardados en el
+`localStorage` de ese navegador;
 no son una base compartida y se pierden si se borran los datos del sitio.
 
 Credenciales de demostración:
