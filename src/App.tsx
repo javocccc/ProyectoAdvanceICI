@@ -13,6 +13,7 @@ import { NuevoExpedientePage } from "./pages/NuevoExpedientePage";
 import { PanelPage } from "./pages/PanelPage";
 import { AdministracionPage } from "./pages/AdministracionPage";
 import { PublicPage } from "./pages/PublicPage";
+import { CambiarContrasenaPage } from "./pages/CambiarContrasenaPage";
 import type { PublicPageKind } from "./pages/PublicPage";
 import logoUcen from "../logoucen.jpg";
 import { obtenerEstadoSistema, registrarConsultaExpediente } from "./services/sistema";
@@ -21,7 +22,7 @@ import { urlApp } from "./utils/rutas";
 import { versionAplicacion } from "./utils/version";
 
 // La navegación es local a esta pestaña: cambiar de vista no cambia la URL.
-type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle" | "administracion";
+type Vista = "panel" | "expedientes" | "nuevo" | "editar" | "detalle" | "administracion" | "cuenta";
 
 const paginasPublicas: Record<string, PublicPageKind> = {
   "/privacidad": "privacidad",
@@ -67,7 +68,7 @@ export default function App() {
   const [estadoSistema, setEstadoSistema] = useState<EstadoSistema | null>(null);
   const [errorEstado, setErrorEstado] = useState("");
   const vistaSegura = esEstudiante
-    ? "detalle"
+    ? (vista === "cuenta" ? "cuenta" : "detalle")
     : (!puedeEditar && (vista === "nuevo" || vista === "editar"))
       || (!puedeAdministrar && vista === "administracion")
       ? "panel"
@@ -240,6 +241,13 @@ export default function App() {
           >
             <Icon name="settings" /> Administración
           </button>}
+          {esEstudiante && <button
+            type="button"
+            className={vistaSegura === "cuenta" ? "active" : ""}
+            onClick={() => navegar("cuenta")}
+          >
+            <Icon name="user" /> Mi cuenta
+          </button>}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-identity">
@@ -305,6 +313,8 @@ export default function App() {
                     ? "Editar expediente"
                     : vistaSegura === "administracion"
                       ? "Administración"
+                        : vistaSegura === "cuenta"
+                          ? "Mi cuenta"
                       : "Expedientes"}
             </strong>
           </div>
@@ -326,7 +336,7 @@ export default function App() {
             <div className="content-loading">Cargando expedientes…</div>
           ) : (
             <>
-              {esEstudiante && !usuario.expedienteId ? (
+              {esEstudiante && !usuario.expedienteId && vistaSegura !== "cuenta" ? (
                 <section className="admin-card">
                   <h1>Expediente pendiente de vinculación</h1>
                   <p>Su cuenta todavía no está asociada a un expediente. Solicite al Administrador que complete la vinculación.</p>
@@ -375,6 +385,7 @@ export default function App() {
               {vistaSegura === "administracion" && puedeAdministrar && (
                 <AdministracionPage alCambiarEstado={setEstadoSistema} />
               )}
+              {vistaSegura === "cuenta" && esEstudiante && <CambiarContrasenaPage />}
             </>
           )}
         </main>

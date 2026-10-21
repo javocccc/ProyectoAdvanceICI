@@ -520,6 +520,12 @@ export const crearCuenta = onCall(async (request) => {
   }
   const nombre = exigirTexto(request.data?.nombre, "nombre", 120);
   const rol = exigirRolApp(request.data?.rol);
+  const password = request.data?.password === undefined
+    ? ""
+    : exigirTexto(request.data.password, "contraseña", 128);
+  if (rol === "estudiante" && password.length < 8) {
+    throw new HttpsError("invalid-argument", "La contraseña inicial del estudiante debe tener al menos 8 caracteres.");
+  }
   const expedienteId = request.data?.expedienteId === undefined
     ? ""
     : exigirTexto(request.data.expedienteId, "expediente", 100);
@@ -529,7 +535,7 @@ export const crearCuenta = onCall(async (request) => {
 
   let cuenta: Awaited<ReturnType<typeof authAdmin.createUser>>;
   try {
-    cuenta = await authAdmin.createUser({ email, displayName: nombre });
+    cuenta = await authAdmin.createUser({ email, displayName: nombre, ...(password ? { password } : {}) });
   } catch (error) {
     if (
       typeof error === "object" &&

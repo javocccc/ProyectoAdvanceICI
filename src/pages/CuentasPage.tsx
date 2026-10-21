@@ -37,6 +37,7 @@ export function CuentasPage() {
   const [borradores, setBorradores] = useState<Record<string, CuentaBorrador>>({});
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [rolNuevo, setRolNuevo] = useState<Rol>("coordinador");
   const [expedienteNuevo, setExpedienteNuevo] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -88,12 +89,16 @@ export function CuentasPage() {
         nombre: nombre.trim(),
         email: email.trim(),
         rol: rolNuevo,
+        ...(rolNuevo === "estudiante" ? { password } : {}),
         ...(rolNuevo === "estudiante" ? { expedienteId: expedienteNuevo } : {}),
       });
       setNombre("");
       setEmail("");
+      setPassword("");
       setExpedienteNuevo("");
-      try {
+      if (rolNuevo === "estudiante") {
+        setAviso(`Cuenta de estudiante creada para ${cuenta.email}. Puede iniciar sesión y cambiar la contraseña desde “Mi cuenta”.`);
+      } else try {
         await enviarInvitacion(cuenta.email);
         setAviso(`Cuenta creada. Enviamos las instrucciones de acceso a ${cuenta.email}.`);
       } catch {
@@ -174,8 +179,8 @@ export function CuentasPage() {
   return (
     <section className="accounts-admin">
       <section className="admin-card">
-        <h2>Invitar una cuenta</h2>
-        <p>Crea una cuenta Firebase y envía un enlace de establecimiento de contraseña. Para estudiantes, el expediente puede dejarse vacío y vincularse después.</p>
+        <h2>Crear una cuenta</h2>
+        <p>Crea una cuenta Firebase. Para estudiantes, define una contraseña inicial que podrán cambiar al iniciar sesión. El expediente puede vincularse ahora o después.</p>
         {!firebaseConfigurado && <p className="admin-note">La gestión de cuentas no está disponible en modo de demostración.</p>}
         <form className="account-form" onSubmit={(evento) => void invitar(evento)}>
           <label>
@@ -200,6 +205,13 @@ export function CuentasPage() {
           </label>
           {rolNuevo === "estudiante" && (
             <label>
+              Contraseña inicial
+              <input type="password" value={password} onChange={(evento) => setPassword(evento.target.value)} required minLength={8} maxLength={128} autoComplete="new-password" />
+              <small>Debe tener al menos 8 caracteres. Comuníquela al estudiante por un medio seguro.</small>
+            </label>
+          )}
+          {rolNuevo === "estudiante" && (
+            <label>
               Expediente del estudiante (opcional al crear)
               <select value={expedienteNuevo} onChange={(evento) => setExpedienteNuevo(evento.target.value)}>
                 <option value="">Sin expediente por el momento</option>
@@ -212,7 +224,7 @@ export function CuentasPage() {
             </label>
           )}
           <button className="button button-primary" type="submit" disabled={!firebaseConfigurado || ocupado !== null || cargando}>
-            {ocupado === "crear" ? "Creando cuenta…" : "Crear cuenta y enviar invitación"}
+            {ocupado === "crear" ? "Creando cuenta…" : rolNuevo === "estudiante" ? "Crear cuenta de estudiante" : "Crear cuenta y enviar invitación"}
           </button>
         </form>
       </section>

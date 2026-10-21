@@ -29,6 +29,7 @@ export async function crearCuenta(datos: {
   nombre: string;
   rol: Rol;
   expedienteId?: string;
+  password?: string;
 }): Promise<CuentaApp> {
   const resultado = await callable<typeof datos, CuentaApp>("crearCuenta")(datos);
   return resultado.data;
