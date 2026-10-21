@@ -7,6 +7,7 @@ import {
   type ResumenExpedientes,
 } from "../services/expedientes";
 import { mensajeErrorAlmacenamientoDemo } from "../services/almacenamientoDemo";
+import { mensajeErrorFirebase } from "../utils/errorFirebase";
 
 interface PanelProps {
   alBuscar: (texto: string) => void;
@@ -42,7 +43,7 @@ export function PanelPage({
         if (vigente) {
           setErrorResumen(
             mensajeErrorAlmacenamientoDemo(problema) ??
-              "No fue posible cargar el resumen de expedientes.",
+              mensajeErrorFirebase(problema, "listado"),
           );
         }
       });

@@ -4,17 +4,17 @@ service cloud.firestore {
     // El documento usuarios/<uid> lo administra alguien con acceso a Firebase.
     function rolUsuario() {
       return request.auth == null ? null
-        : get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
+        : get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', null);
     }
 
     function esAdministrador() {
       return rolUsuario() in ['administrador', 'direccion']
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo != false;
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('activo', true) != false;
     }
 
     function esCoordinador() {
       return rolUsuario() in ['coordinador', 'secretaria']
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo != false;
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('activo', true) != false;
     }
 
     function esEstudiante() {
@@ -27,7 +27,7 @@ service cloud.firestore {
 
     function esEstudianteVinculado(id) {
       return esEstudiante()
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo != false
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('activo', true) != false
         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.expedienteId == id
         && get(/databases/$(database)/documents/expedientes/$(id)).data.estudianteUid == request.auth.uid;
     }
