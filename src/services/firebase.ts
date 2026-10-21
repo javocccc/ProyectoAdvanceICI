@@ -16,7 +16,7 @@ export const firebaseConfigurado = Boolean(
   import.meta.env.VITE_FIREBASE_APP_ID,
 );
 
-const config = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -29,7 +29,7 @@ const config = {
 const app = firebaseConfigurado
   ? getApps().length
     ? getApp()
-    : initializeApp(config)
+    : initializeApp(firebaseConfig)
   : null;
 
 // Los demás módulos comprueban si cada servicio es null: null significa demo.

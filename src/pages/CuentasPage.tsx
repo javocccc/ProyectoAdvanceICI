@@ -24,11 +24,9 @@ function mensajeErrorCuenta(error: unknown): string {
   const codigo = typeof error === "object" && error !== null && "code" in error
     ? String(error.code)
     : "";
-  if (codigo.endsWith("/internal")) return "Firebase rechazó la creación en el servidor. La cuenta no se confirmó; revise los registros de Cloud Functions para crearCuenta y despliegue la función actualizada en us-central1.";
-  if (codigo.endsWith("/unauthenticated")) return "La sesión de Administrador venció. Cierre sesión, vuelva a ingresar e intente otra vez.";
-  if (codigo.endsWith("/invalid-argument")) return error instanceof Error ? error.message : "Revise el correo y que la contraseña tenga al menos 8 caracteres.";
-  if (codigo.endsWith("/already-exists")) return error instanceof Error ? error.message : "Ya existe una cuenta con ese correo o el expediente está vinculado.";
-  if (codigo.endsWith("/unavailable")) return "Firebase Functions no está disponible. Compruebe la conexión e intente nuevamente.";
+  if (codigo === "auth/email-already-in-use") return "Ya existe una cuenta con ese correo.";
+  if (codigo === "auth/weak-password" || codigo === "auth/password-does-not-meet-requirements") return "La contraseña no cumple la política de Firebase. Use una contraseña más segura.";
+  if (codigo === "auth/invalid-email") return "Ingrese un correo electrónico válido.";
   if (codigo.includes("permission-denied")) return "Solo un Administrador activo puede gestionar cuentas.";
   if (codigo.includes("already-exists")) return "Ya existe esa cuenta o el expediente ya está vinculado a otro estudiante.";
   if (codigo.includes("failed-precondition")) return error instanceof Error ? error.message : "No se puede realizar este cambio.";
@@ -288,13 +286,13 @@ export function CuentasPage() {
                       <td className="account-actions">
                         {cuenta.activo ? (
                           <>
-                            <button className="inline-action" type="button" onClick={() => void guardar(cuenta)} disabled={ocupado !== null || !borrador.nombre.trim() || (borrador.rol === "estudiante" && !borrador.expedienteId)}>
+                            <button className="inline-action" type="button" onClick={() => void guardar(cuenta)} disabled={ocupado !== null || !borrador.nombre.trim()}>
                               {ocupado === cuenta.uid ? "Guardando…" : "Guardar"}
                             </button>
                             <button className="inline-action" type="button" onClick={() => void reenviarInvitacion(cuenta)} disabled={ocupado !== null}>Reenviar invitación</button>
                             <button className="inline-action account-delete" type="button" onClick={() => void desactivar(cuenta)} disabled={ocupado !== null || cuenta.uid === "administrador-demo"}>Desactivar</button>
                           </>
-                        ) : "Acceso eliminado"}
+                        ) : "Acceso desactivado"}
                       </td>
                     </tr>
                   );

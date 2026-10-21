@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUsuario({
           id: cuenta.uid,
           email: cuenta.email ?? "",
-          nombre: cuenta.displayName || cuenta.email?.split("@")[0] || "Usuario ICI",
+          nombre: (typeof datosFicha?.nombre === "string" ? datosFicha.nombre : null) || cuenta.displayName || cuenta.email?.split("@")[0] || "Usuario ICI",
           rol,
           expedienteId: typeof datosFicha?.expedienteId === "string"
             ? datosFicha.expedienteId

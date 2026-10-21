@@ -82,20 +82,19 @@ reales ni como mecanismo de autenticación de producción.
    como alias de esos roles. Los perfiles `consulta` no tendrán acceso a ningún
    expediente hasta que Administración los vincule.
 
-7. Despliega las reglas de Firestore, Storage y las cuatro funciones para
-   gestionar cuentas:
+7. Despliega las reglas de Firestore para habilitar la gestión de cuentas desde
+   la aplicación:
 
    ```powershell
-   firebase deploy --only firestore:rules,storage,functions:listarCuentas,functions:crearCuenta,functions:actualizarCuenta,functions:eliminarCuenta --project <ID_DEL_PROYECTO>
+   firebase deploy --only firestore:rules --project <ID_DEL_PROYECTO>
    ```
 
-   Cloud Functions requiere el plan Firebase Blaze. La primera función de
-   administración verifica en servidor el rol del solicitante; no se puede
-   asignar a uno mismo el rol Administrador desde la interfaz, y no se permite
-   desactivar ni degradar al último Administrador. La desactivación borra la
-   cuenta de Firebase Authentication y conserva un perfil inactivo para
-   trazabilidad. Para invitar una cuenta, el administrador debe enviar el
-   enlace de establecimiento de contraseña generado por Firebase.
+   La gestión de cuentas usa Firebase Authentication y Firestore desde el
+   navegador y no necesita Cloud Functions ni el plan Blaze. Las reglas limitan
+   la gestión de perfiles a Administradores activos. La desactivación conserva
+   la cuenta de Authentication, marca su perfil inactivo y bloquea su acceso a
+   los datos de la aplicación. Para cuentas sin contraseña inicial, se envía
+   un enlace de restablecimiento de contraseña.
 
 8. La pantalla **Administración → Cuentas y roles** permite crear cuentas,
    cambiar nombre/rol, vincular o cambiar el expediente de un estudiante,

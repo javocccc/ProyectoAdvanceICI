@@ -71,8 +71,22 @@ service cloud.firestore {
     }
 
     match /usuarios/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false; // Crear este documento manualmente en la consola Firebase.
+      allow read: if (request.auth != null && request.auth.uid == uid) || esAdministrador();
+      allow create: if esAdministrador()
+        && request.resource.data.keys().hasOnly(['email', 'nombre', 'rol', 'activo', 'expedienteId'])
+        && request.resource.data.keys().hasAll(['email', 'nombre', 'rol', 'activo'])
+        && request.resource.data.email is string
+        && request.resource.data.nombre is string
+        && request.resource.data.rol in ['administrador', 'direccion', 'coordinador', 'secretaria', 'estudiante', 'consulta']
+        && request.resource.data.activo is bool;
+      allow update: if esAdministrador()
+        && request.resource.data.keys().hasOnly(['email', 'nombre', 'rol', 'activo', 'expedienteId'])
+        && request.resource.data.keys().hasAll(['email', 'nombre', 'rol', 'activo'])
+        && request.resource.data.email is string
+        && request.resource.data.nombre is string
+        && request.resource.data.rol in ['administrador', 'direccion', 'coordinador', 'secretaria', 'estudiante', 'consulta']
+        && request.resource.data.activo is bool;
+      allow delete: if false;
     }
 
     match /configuracion/sistema {
