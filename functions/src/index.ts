@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
+import { logger } from "firebase-functions";
 import {
   describirCambioAuditable,
   esRutDuplicado,
@@ -545,7 +546,17 @@ export const crearCuenta = onCall(async (request) => {
     ) {
       throw new HttpsError("already-exists", "Ya existe una cuenta con ese correo.");
     }
-    throw error;
+    const codigo = typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : "unknown";
+    logger.error("crearCuenta: Firebase Authentication rechazó la creación", { codigo, email });
+    if (codigo.includes("invalid-password") || codigo.includes("password-does-not-meet-requirements")) {
+      throw new HttpsError("invalid-argument", "La contraseña no cumple la política de Firebase. Use una contraseña más segura.");
+    }
+    if (codigo.includes("invalid-email")) {
+      throw new HttpsError("invalid-argument", "Firebase no acepta el correo ingresado.");
+    }
+    throw new HttpsError("internal", "Firebase Authentication no pudo crear la cuenta. Revise los registros de Cloud Functions.");
   }
 
   try {
@@ -578,6 +589,7 @@ export const crearCuenta = onCall(async (request) => {
       if (expedienteRef) transaccion.update(expedienteRef, { estudianteUid: cuenta.uid });
     });
   } catch (error) {
+    logger.error("crearCuenta: falló la creación del perfil o su vínculo", { uid: cuenta.uid, email, error });
     try {
       await authAdmin.deleteUser(cuenta.uid);
     } catch {

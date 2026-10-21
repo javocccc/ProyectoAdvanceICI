@@ -24,6 +24,11 @@ function mensajeErrorCuenta(error: unknown): string {
   const codigo = typeof error === "object" && error !== null && "code" in error
     ? String(error.code)
     : "";
+  if (codigo.endsWith("/internal")) return "Firebase rechazó la creación en el servidor. La cuenta no se confirmó; revise los registros de Cloud Functions para crearCuenta y despliegue la función actualizada en us-central1.";
+  if (codigo.endsWith("/unauthenticated")) return "La sesión de Administrador venció. Cierre sesión, vuelva a ingresar e intente otra vez.";
+  if (codigo.endsWith("/invalid-argument")) return error instanceof Error ? error.message : "Revise el correo y que la contraseña tenga al menos 8 caracteres.";
+  if (codigo.endsWith("/already-exists")) return error instanceof Error ? error.message : "Ya existe una cuenta con ese correo o el expediente está vinculado.";
+  if (codigo.endsWith("/unavailable")) return "Firebase Functions no está disponible. Compruebe la conexión e intente nuevamente.";
   if (codigo.includes("permission-denied")) return "Solo un Administrador activo puede gestionar cuentas.";
   if (codigo.includes("already-exists")) return "Ya existe esa cuenta o el expediente ya está vinculado a otro estudiante.";
   if (codigo.includes("failed-precondition")) return error instanceof Error ? error.message : "No se puede realizar este cambio.";
