@@ -175,7 +175,7 @@ export function CuentasPage() {
     <section className="accounts-admin">
       <section className="admin-card">
         <h2>Invitar una cuenta</h2>
-        <p>Crea una cuenta Firebase y envía un enlace de establecimiento de contraseña. Los roles disponibles son fijos.</p>
+        <p>Crea una cuenta Firebase y envía un enlace de establecimiento de contraseña. Para estudiantes, el expediente puede dejarse vacío y vincularse después.</p>
         {!firebaseConfigurado && <p className="admin-note">La gestión de cuentas no está disponible en modo de demostración.</p>}
         <form className="account-form" onSubmit={(evento) => void invitar(evento)}>
           <label>
@@ -200,9 +200,9 @@ export function CuentasPage() {
           </label>
           {rolNuevo === "estudiante" && (
             <label>
-              Expediente del estudiante
-              <select value={expedienteNuevo} onChange={(evento) => setExpedienteNuevo(evento.target.value)} required>
-                <option value="">Seleccione un expediente</option>
+              Expediente del estudiante (opcional al crear)
+              <select value={expedienteNuevo} onChange={(evento) => setExpedienteNuevo(evento.target.value)}>
+                <option value="">Sin expediente por el momento</option>
                 {expedientesDisponibles().map((expediente) => (
                   <option key={expediente.id} value={expediente.id}>
                     {expediente.nombre} · {expediente.rut}

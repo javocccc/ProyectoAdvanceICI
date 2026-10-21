@@ -523,9 +523,6 @@ export const crearCuenta = onCall(async (request) => {
   const expedienteId = request.data?.expedienteId === undefined
     ? ""
     : exigirTexto(request.data.expedienteId, "expediente", 100);
-  if (rol === "estudiante" && !expedienteId) {
-    throw new HttpsError("invalid-argument", "Debe vincular un expediente a cada cuenta de estudiante.");
-  }
   if (rol !== "estudiante" && expedienteId) {
     throw new HttpsError("invalid-argument", "Solo las cuentas de estudiante pueden vincularse a un expediente.");
   }
@@ -597,9 +594,6 @@ export const actualizarCuenta = onCall(async (request) => {
   const expedienteId = request.data?.expedienteId === undefined
     ? ""
     : exigirTexto(request.data.expedienteId, "expediente", 100);
-  if (rol === "estudiante" && !expedienteId) {
-    throw new HttpsError("invalid-argument", "Debe vincular un expediente a cada cuenta de estudiante.");
-  }
   if (rol !== "estudiante" && expedienteId) {
     throw new HttpsError("invalid-argument", "Solo las cuentas de estudiante pueden vincularse a un expediente.");
   }
