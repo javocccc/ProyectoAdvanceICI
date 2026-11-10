@@ -3,6 +3,7 @@ dist/
 functions/lib/
 .env
 .env.local
+supabase/functions/.env*
 .tools/
 .node-portable.zip
 .impeccable/

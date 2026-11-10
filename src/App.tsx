@@ -241,13 +241,13 @@ export default function App() {
           >
             <Icon name="settings" /> Administración
           </button>}
-          {esEstudiante && <button
+          <button
             type="button"
             className={vistaSegura === "cuenta" ? "active" : ""}
             onClick={() => navegar("cuenta")}
           >
             <Icon name="user" /> Mi cuenta
-          </button>}
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-identity">
@@ -385,7 +385,7 @@ export default function App() {
               {vistaSegura === "administracion" && puedeAdministrar && (
                 <AdministracionPage alCambiarEstado={setEstadoSistema} />
               )}
-              {vistaSegura === "cuenta" && esEstudiante && <CambiarContrasenaPage />}
+              {vistaSegura === "cuenta" && <CambiarContrasenaPage />}
             </>
           )}
         </main>

@@ -73,7 +73,7 @@ reales ni como mecanismo de autenticación de producción.
 
    Los roles son fijos: `administrador`, `coordinador` y `estudiante`.
    Administración tiene control total de las funciones y puede invitar,
-   cambiar roles y desactivar cuentas; Coordinación puede crear y actualizar
+   cambiar roles y eliminar cuentas; Coordinación puede crear y actualizar
    expedientes y gestionar actas, pero no administrar cuentas ni cambiar
    colegiatura; Estudiante solo consulta el expediente asociado a su UID. El
    perfil del estudiante y el expediente deben apuntarse mutuamente mediante
@@ -82,24 +82,72 @@ reales ni como mecanismo de autenticación de producción.
    como alias de esos roles. Los perfiles `consulta` no tendrán acceso a ningún
    expediente hasta que Administración los vincule.
 
-7. Despliega las reglas de Firestore para habilitar la gestión de cuentas desde
-   la aplicación:
+7. En el plan Spark, publica las reglas de Firestore antes de habilitar la
+   gestión de cuentas:
 
    ```powershell
    firebase deploy --only firestore:rules --project <ID_DEL_PROYECTO>
    ```
 
-   La gestión de cuentas usa Firebase Authentication y Firestore desde el
-   navegador y no necesita Cloud Functions ni el plan Blaze. Las reglas limitan
-   la gestión de perfiles a Administradores activos. La desactivación conserva
-   la cuenta de Authentication, marca su perfil inactivo y bloquea su acceso a
-   los datos de la aplicación. Para cuentas sin contraseña inicial, se envía
-   un enlace de restablecimiento de contraseña.
+   La aplicación crea la cuenta en Firebase Authentication con una sesión
+   secundaria y guarda su perfil en Firestore. Las reglas permiten gestionar
+   perfiles solo a un Administrador activo e impiden que se quite su propio rol.
+   La eliminación definitiva requiere la función de Supabase descrita abajo:
+   borra la cuenta de Authentication y su perfil, y libera el correo para volver
+   a crearlo desde un CSV. Al crear un estudiante manualmente, Administración
+   define su contraseña inicial. Para los demás roles y para la importación CSV,
+   Firebase acepta la solicitud de correo con el enlace para definir la
+   contraseña; la entrega depende del servicio de correo. Si el correo no llega,
+   la aplicación muestra una contraseña temporal solo al crear la cuenta para
+   comunicarla por un canal privado. La persona debe cambiarla desde **Mi cuenta**
+   después de ingresar.
 
 8. La pantalla **Administración → Cuentas y roles** permite crear cuentas,
    cambiar nombre/rol, vincular o cambiar el expediente de un estudiante,
-   reenviar invitaciones y desactivar cuentas. No crea roles personalizados:
+   reenviar invitaciones y eliminar cuentas. No crea roles personalizados:
    los tres perfiles de permisos son deliberadamente fijos.
+
+   **Importar estudiantes** acepta un archivo CSV UTF-8 exportado desde Excel,
+   con las columnas exactas `nombre,email,rut`. La pantalla ofrece la plantilla,
+   revisa duplicados y muestra la ficha vinculada antes de crear cuentas. `rut`
+   puede quedar vacío; si se informa, debe corresponder a un expediente ya
+   existente y sin estudiante vinculado. Se admiten hasta 200 filas y 1 MB por
+   archivo. Cada fila se procesa por separado y el resultado queda visible;
+   una falla no revierte las cuentas que ya se crearon. La importación no crea
+   expedientes ni acepta contraseñas en el archivo. Las contraseñas temporales
+   se muestran solo en el resultado de esa importación; guárdalas antes de
+   salir de la pantalla si necesitas distribuirlas de forma privada.
+
+### Activar la eliminación de cuentas en Spark
+
+Firebase Spark no permite desplegar Cloud Functions. La acción **Eliminar** usa
+la función `supabase/functions/eliminar-cuenta/index.ts` en el mismo proyecto
+Supabase que guarda las actas. Antes de usarla:
+
+1. En **Firebase Console → Configuración del proyecto → Cuentas de servicio**,
+   genera una clave privada JSON de la cuenta de servicio del proyecto
+   `advanceici`. En **Supabase → Edge Functions → Secrets**, crea el secreto
+   `FIREBASE_SERVICE_ACCOUNT_JSON` con el contenido completo de ese JSON.
+   Guárdalo únicamente en Supabase; no lo pongas en `.env`, en GitHub ni en el
+   navegador. La cuenta de servicio debe poder leer y escribir Firestore y
+   eliminar usuarios de Firebase Authentication.
+2. Desde la raíz de este proyecto, inicia sesión y despliega la función:
+
+   ```powershell
+   npx supabase login
+   npx supabase functions deploy eliminar-cuenta --project-ref <REF_SUPABASE> --no-verify-jwt
+   ```
+
+   `<REF_SUPABASE>` es el identificador que aparece entre `https://` y
+   `.supabase.co` en `VITE_SUPABASE_URL`. Se desactiva la verificación JWT de
+   Supabase porque la función comprueba el token Firebase y el perfil de
+   Administrador activo por sí misma. No desactives esa comprobación interna.
+3. Publica nuevamente el frontend si cambiaste su código. En **Cuentas y roles**,
+   elimina una cuenta de prueba y comprueba que desaparece de la tabla y de
+   Firebase Authentication. Después importa de nuevo el mismo correo desde CSV.
+   Si falla la eliminación de Authentication, el perfil queda inactivo y visible
+   para que puedas pulsar **Eliminar** otra vez. La función conserva los
+   expedientes y su historial, pero quita el vínculo de la cuenta eliminada.
 
 La opción de recuperación de contraseña envía el enlace con Firebase
 Authentication. Configura y prueba la plantilla de correo de restablecimiento
@@ -130,8 +178,9 @@ disponible en el modo de demostración.
    **Settings → Secrets and variables → Actions → Variables**. El flujo
    `.github/workflows/deploy.yml` las incorpora a la compilación.
 4. Supabase requiere las claims Firebase `role: authenticated` y `actas: true`.
-   Las crea automáticamente Cloud Functions al invitar o actualizar el rol.
-   Para cuentas existentes, ejecuta desde
+   En Spark, las cuentas creadas desde la aplicación no obtienen esas claims
+   automáticamente. Para conceder acceso a actas a Administradores y
+   Coordinadores, ejecuta desde
    `functions/` el script con credenciales de administrador de Firebase:
 
    ```powershell
@@ -170,8 +219,8 @@ disponible.
 La aplicación lee y escribe expedientes directamente desde el navegador.
 Antes de usarla con datos reales, publica `firestore.rules` en el proyecto
 correcto. No hace falta migrar documentos para aplicar estas reglas. La
-administración de cuentas sí requiere las Cloud Functions indicadas en la
-configuración de Firebase.
+creación y edición de cuentas funcionan en Spark mediante Authentication y las
+reglas de Firestore. La eliminación usa la función de Supabase indicada arriba.
 
 ```powershell
 firebase login
@@ -204,7 +253,9 @@ se publica por separado; `firebase.json` aún no configura Firebase Hosting.
   hechas fuera de la interfaz.
 - Administración puede activar o desactivar mantenimiento desde esa misma pantalla.
   Solo el estado y el mensaje de mantenimiento se pueden leer sin iniciar
-  sesión; su edición está protegida por rol. El modo demo conserva estas
+  sesión; su edición está protegida por rol. Durante mantenimiento, las reglas
+  bloquean las lecturas y escrituras de expedientes para Coordinación y
+  Estudiantes. El modo demo conserva estas
   opciones y sus registros localmente en el navegador.
 - Las rutas públicas usan `?page=` para evitar depender de una regla de
   fallback del proveedor estático; el build genera además `404.html` para
@@ -222,8 +273,9 @@ deben considerarse informativas hasta la validación institucional.
   expedientes y gestionar actas, pero no cambiar colegiatura. Estudiantes solo
   pueden leer el expediente vinculado a su UID. Firestore aplica estos límites
   aunque alguien intente llamar directamente al servicio desde el navegador.
-  Los datos de expediente se siguen operando directamente en Firestore; la
-  administración de cuentas sí requiere las Cloud Functions descritas arriba.
+  Los datos de expediente se siguen operando directamente en Firestore;
+  la creación y edición de cuentas usan Authentication y reglas de Firestore;
+  su eliminación pasa por la función de Supabase.
   El historial de cambios se guarda en cada documento y un cliente autorizado
   podría alterarlo: no es una auditoría inmutable de servidor.
 - La búsqueda y el resumen leen la colección completa para incluir fichas

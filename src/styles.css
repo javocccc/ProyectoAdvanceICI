@@ -1775,6 +1775,100 @@ select {
 .account-delete {
   color: #a52c22;
 }
+.temporary-password {
+  margin-top: 12px;
+  max-width: 100%;
+  color: var(--navy);
+}
+.temporary-password summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 700;
+}
+.temporary-password p {
+  margin: 8px 0 !important;
+}
+.temporary-password code {
+  display: inline-block;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #eef2f8;
+  color: var(--navy);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.bulk-import .section-heading {
+  align-items: start;
+  gap: 18px;
+}
+.bulk-import .section-heading .button {
+  flex: none;
+}
+.bulk-format {
+  margin: 16px 0 !important;
+}
+.bulk-format code {
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+.bulk-file-label {
+  display: block;
+  margin: 18px 0 8px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bulk-import input[type="file"] {
+  display: block;
+  max-width: 100%;
+  color: var(--ink);
+  font: inherit;
+}
+.bulk-import input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 9px 12px;
+  border: 1px solid #cfd8e5;
+  border-radius: 7px;
+  background: white;
+  color: var(--navy);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bulk-review,
+.bulk-results {
+  margin-top: 20px;
+}
+.bulk-review .button {
+  margin-top: 16px;
+}
+.bulk-review td,
+.bulk-results td {
+  overflow-wrap: anywhere;
+}
+.bulk-review td:nth-child(2),
+.bulk-results td:nth-child(2) {
+  min-width: 150px;
+}
+.bulk-row-error {
+  color: #a52c22;
+  font-weight: 700;
+}
+.bulk-row-ok {
+  color: #126f54;
+  font-weight: 700;
+}
+.bulk-results h3 {
+  margin: 0 0 8px;
+  color: var(--navy);
+  font-size: 16px;
+}
+@media (max-width: 700px) {
+  .bulk-import .section-heading {
+    flex-direction: column;
+  }
+}
 
 @media (max-width: 700px) {
   .public-header {

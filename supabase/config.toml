@@ -1,0 +1,3 @@
+[functions.eliminar-cuenta]
+# El token Firebase se valida dentro de la función con las claves públicas de Google.
+verify_jwt = false

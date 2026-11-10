@@ -524,10 +524,10 @@ export const crearCuenta = onCall(async (request) => {
   const password = request.data?.password === undefined
     ? ""
     : exigirTexto(request.data.password, "contraseña", 128);
-  if (rol === "estudiante" && password.length < 8) {
+  if (password && password.length < 8) {
     throw new HttpsError("invalid-argument", "La contraseña inicial del estudiante debe tener al menos 8 caracteres.");
   }
-  const expedienteId = request.data?.expedienteId === undefined
+  const expedienteId = !request.data?.expedienteId
     ? ""
     : exigirTexto(request.data.expedienteId, "expediente", 100);
   if (rol !== "estudiante" && expedienteId) {
@@ -559,8 +559,11 @@ export const crearCuenta = onCall(async (request) => {
     throw new HttpsError("internal", "Firebase Authentication no pudo crear la cuenta. Revise los registros de Cloud Functions.");
   }
 
+  let etapa = "permisos";
   try {
-    await actualizarClaimsActas(cuenta, rol);
+    // Una cuenta recién creada de estudiante no necesita claims para actas.
+    if (rol !== "estudiante") await actualizarClaimsActas(cuenta, rol);
+    etapa = "perfil";
     const usuarioRef = db.collection("usuarios").doc(cuenta.uid);
     const expedienteRef = expedienteId
       ? db.collection("expedientes").doc(expedienteId)
@@ -589,7 +592,7 @@ export const crearCuenta = onCall(async (request) => {
       if (expedienteRef) transaccion.update(expedienteRef, { estudianteUid: cuenta.uid });
     });
   } catch (error) {
-    logger.error("crearCuenta: falló la creación del perfil o su vínculo", { uid: cuenta.uid, email, error });
+    logger.error("crearCuenta: falló la creación del perfil o su vínculo", { uid: cuenta.uid, email, etapa, error });
     try {
       await authAdmin.deleteUser(cuenta.uid);
     } catch {
@@ -598,7 +601,13 @@ export const crearCuenta = onCall(async (request) => {
         "No se pudo completar el perfil ni limpiar la cuenta autenticada. Revise Firebase Authentication.",
       );
     }
-    throw error;
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError(
+      "internal",
+      etapa === "permisos"
+        ? "No se pudieron configurar los permisos de la nueva cuenta. Revise los registros de crearCuenta."
+        : "No se pudo guardar el perfil de la nueva cuenta. Revise los registros de crearCuenta.",
+    );
   }
   return { uid: cuenta.uid, email, nombre, rol, activo: true, expedienteId: expedienteId || null };
 });
@@ -609,7 +618,7 @@ export const actualizarCuenta = onCall(async (request) => {
   const uid = exigirTexto(request.data?.uid, "UID", 128);
   const nombre = exigirTexto(request.data?.nombre, "nombre", 120);
   const rol = exigirRolApp(request.data?.rol);
-  const expedienteId = request.data?.expedienteId === undefined
+  const expedienteId = !request.data?.expedienteId
     ? ""
     : exigirTexto(request.data.expedienteId, "expediente", 100);
   if (rol !== "estudiante" && expedienteId) {

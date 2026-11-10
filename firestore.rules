@@ -25,6 +25,30 @@ service cloud.firestore {
       return esAdministrador() || esCoordinador();
     }
 
+    function sistemaDisponible() {
+      return esAdministrador()
+        || !exists(/databases/$(database)/documents/configuracion/sistema)
+        || get(/databases/$(database)/documents/configuracion/sistema).data.get('mantenimiento', false) != true;
+    }
+
+    function perfilValido() {
+      return request.resource.data.keys().hasOnly(['email', 'nombre', 'rol', 'activo', 'expedienteId'])
+        && request.resource.data.keys().hasAll(['email', 'nombre', 'rol', 'activo'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 3
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 120
+        && request.resource.data.rol in ['administrador', 'direccion', 'coordinador', 'secretaria', 'estudiante', 'consulta']
+        && request.resource.data.activo is bool
+        && (!('expedienteId' in request.resource.data)
+          || (request.resource.data.rol in ['estudiante', 'consulta']
+            && request.resource.data.expedienteId is string
+            && request.resource.data.expedienteId.size() > 0
+            && request.resource.data.expedienteId.size() <= 100));
+    }
+
     function esEstudianteVinculado(id) {
       return esEstudiante()
         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('activo', true) != false
@@ -54,18 +78,18 @@ service cloud.firestore {
     }
 
     match /expedientes/{id} {
-      allow get: if puedeLeerExpediente(id);
-      allow list: if puedeLeer();
-      allow create: if esAdministrador() || (esCoordinador() && creacionCoordinador());
-      allow update: if esAdministrador()
+      allow get: if sistemaDisponible() && puedeLeerExpediente(id);
+      allow list: if sistemaDisponible() && puedeLeer();
+      allow create: if sistemaDisponible() && (esAdministrador() || (esCoordinador() && creacionCoordinador()));
+      allow update: if sistemaDisponible() && (esAdministrador()
         || (esCoordinador() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'nombre', 'rut', 'anioEgreso', 'semestreEgreso', 'fechaExamen',
           'notaExamen', 'comision', 'acta', 'historialAuditoria'
-        ]));
+        ])));
       allow delete: if false;
 
       match /auditoria/{registroId} {
-        allow get, list: if puedeLeer() || esEstudianteVinculado(id);
+        allow get, list: if sistemaDisponible() && (puedeLeer() || esEstudianteVinculado(id));
         allow create, update, delete: if false;
       }
     }
@@ -73,19 +97,30 @@ service cloud.firestore {
     match /usuarios/{uid} {
       allow read: if (request.auth != null && request.auth.uid == uid) || esAdministrador();
       allow create: if esAdministrador()
-        && request.resource.data.keys().hasOnly(['email', 'nombre', 'rol', 'activo', 'expedienteId'])
-        && request.resource.data.keys().hasAll(['email', 'nombre', 'rol', 'activo'])
-        && request.resource.data.email is string
-        && request.resource.data.nombre is string
-        && request.resource.data.rol in ['administrador', 'direccion', 'coordinador', 'secretaria', 'estudiante', 'consulta']
-        && request.resource.data.activo is bool;
+        && perfilValido()
+        && request.resource.data.activo == true;
       allow update: if esAdministrador()
-        && request.resource.data.keys().hasOnly(['email', 'nombre', 'rol', 'activo', 'expedienteId'])
-        && request.resource.data.keys().hasAll(['email', 'nombre', 'rol', 'activo'])
-        && request.resource.data.email is string
-        && request.resource.data.nombre is string
-        && request.resource.data.rol in ['administrador', 'direccion', 'coordinador', 'secretaria', 'estudiante', 'consulta']
-        && request.resource.data.activo is bool;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nombre', 'rol', 'activo', 'expedienteId'
+        ])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['nombre'])
+          || (request.resource.data.nombre is string
+            && request.resource.data.nombre.size() > 0
+            && request.resource.data.nombre.size() <= 120))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol'])
+          || request.resource.data.rol in ['administrador', 'coordinador', 'estudiante'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['activo'])
+          || request.resource.data.activo is bool)
+        && resource.data.get('activo', true) == true
+        && (request.resource.data.get('expedienteId', null) == null
+          || (request.resource.data.get('rol', null) in ['estudiante', 'consulta']
+            && request.resource.data.expedienteId is string
+            && request.resource.data.expedienteId.size() > 0
+            && request.resource.data.expedienteId.size() <= 100))
+        // Siempre debe quedar activa la cuenta del Administrador que realiza el cambio.
+        && (uid != request.auth.uid
+          || (request.resource.data.rol in ['administrador', 'direccion']
+            && request.resource.data.activo == true));
       allow delete: if false;
     }
 
@@ -105,7 +140,7 @@ service cloud.firestore {
 
     match /consultasExpedientes/{consultaId} {
       allow get, list: if esAdministrador();
-      allow create: if puedeRegistrarConsulta(request.resource.data.expedienteId)
+      allow create: if sistemaDisponible() && puedeRegistrarConsulta(request.resource.data.expedienteId)
         && request.resource.data.keys().hasOnly([
           'fecha', 'usuario', 'usuarioId', 'expedienteId', 'accion'
         ])

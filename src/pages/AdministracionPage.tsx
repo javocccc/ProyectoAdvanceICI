@@ -27,24 +27,29 @@ export function AdministracionPage({ alCambiarEstado }: AdministracionPageProps)
   const [accesos, setAccesos] = useState<AccesoExpediente[]>([]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [estadoDisponible, setEstadoDisponible] = useState(false);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
   async function cargar() {
     setCargando(true);
+    setEstadoDisponible(false);
     setError("");
-    try {
-      const [estadoActual, registros] = await Promise.all([
-        obtenerEstadoSistema(),
-        listarAccesosExpedientes(),
-      ]);
-      setEstado(estadoActual);
-      setAccesos(registros);
-    } catch {
-      setError("No se pudo cargar la configuración y auditoría. Verifique permisos y conexión.");
-    } finally {
-      setCargando(false);
+    const [estadoActual, registros] = await Promise.allSettled([
+      obtenerEstadoSistema(),
+      listarAccesosExpedientes(),
+    ]);
+    if (estadoActual.status === "fulfilled") {
+      setEstado(estadoActual.value);
+      setEstadoDisponible(true);
     }
+    if (registros.status === "fulfilled") setAccesos(registros.value);
+    if (estadoActual.status === "rejected" || registros.status === "rejected") {
+      setError(estadoActual.status === "rejected"
+        ? "No se pudo cargar el estado del sistema. Verifique permisos y conexión antes de guardarlo."
+        : "No se pudo cargar el registro de consultas. Puede seguir gestionando mantenimiento.");
+    }
+    setCargando(false);
   }
 
   useEffect(() => {
@@ -68,6 +73,7 @@ export function AdministracionPage({ alCambiarEstado }: AdministracionPageProps)
       setMensaje(guardado.mantenimiento ? "Modo mantenimiento activado." : "Modo mantenimiento desactivado.");
     } catch {
       setError("No se pudo guardar el estado de mantenimiento. Compruebe que su cuenta tenga rol Administrador.");
+      try { setEstado(await obtenerEstadoSistema()); } catch { /* Se conserva el mensaje de error. */ }
     } finally {
       setGuardando(false);
     }
@@ -109,7 +115,7 @@ export function AdministracionPage({ alCambiarEstado }: AdministracionPageProps)
             placeholder="Estamos realizando mejoras. Vuelva a intentarlo más tarde."
           />
           {estado.actualizadoEn && <small>Última actualización: {fechaAcceso(estado.actualizadoEn)}{estado.actualizadoPor ? ` · ${estado.actualizadoPor}` : ""}</small>}
-          <button className="button button-primary" type="submit" disabled={guardando || cargando}>
+          <button className="button button-primary" type="submit" disabled={guardando || cargando || !estadoDisponible}>
             {guardando ? "Guardando…" : "Guardar estado"}
           </button>
         </form>
