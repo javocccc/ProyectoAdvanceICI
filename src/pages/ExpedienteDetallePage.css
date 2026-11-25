@@ -99,7 +99,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-/* Zona donde se elige o arrastra el PDF antes de subirlo. */
+/* Zona donde se elige o arrastra el archivo antes de subirlo. */
 .ficha-grid .acta-dropzone {
   display: grid;
   justify-items: center;
@@ -119,8 +119,9 @@
   background: #eef3ff;
 }
 .ficha-grid .acta-dropzone strong {
-  font-size: 13px;
+  max-width: 100%;
   overflow-wrap: anywhere;
+  font-size: 13px;
 }
 .ficha-grid .acta-dropzone span {
   color: var(--muted);

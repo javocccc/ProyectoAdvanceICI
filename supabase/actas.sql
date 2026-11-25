@@ -1,8 +1,8 @@
 -- Ejecutar en el SQL Editor del proyecto Supabase conectado a Firebase Auth.
 -- Firebase Project ID: advanceici.
--- El bucket es privado y solo acepta PDFs de menos de 10 MB.
+-- El bucket es privado y acepta cualquier formato de menos de 10 MB.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('actas', 'actas', false, 10485759, array['application/pdf'])
+values ('actas', 'actas', false, 10485759, null)
 on conflict (id) do update
   set public = false,
       file_size_limit = excluded.file_size_limit,
@@ -34,7 +34,6 @@ with check (
   and auth.jwt()->>'actas' = 'true'
   and auth.jwt()->>'iss' = 'https://securetoken.google.com/advanceici'
   and auth.jwt()->>'aud' = 'advanceici'
-  and lower(name) like '%.pdf'
 );
 
 create policy "actas_gestores_borrar"

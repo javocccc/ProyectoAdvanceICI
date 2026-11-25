@@ -7,10 +7,10 @@ export function mensajeErrorFirebase(error: unknown, accion: "guardar" | "audito
     ? String(error.statusCode)
     : "";
   if (estado === "401" || estado === "403") {
-    return "Supabase rechazó el acceso al PDF. Compruebe la integración Firebase Auth, las claims role/actas y las políticas del bucket.";
+    return "Supabase rechazó el acceso al archivo. Compruebe la integración Firebase Auth, las claims role/actas y las políticas del bucket.";
   }
   if (estado === "404") {
-    return "No se encontró el PDF o el bucket privado actas en Supabase.";
+    return "No se encontró el archivo o el bucket privado actas en Supabase.";
   }
   if (codigo.endsWith("/permission-denied") || codigo === "permission-denied" || codigo === "storage/unauthorized") {
     if (accion === "auditoria") {

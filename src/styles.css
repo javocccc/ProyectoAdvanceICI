@@ -1507,10 +1507,6 @@ select {
   color: var(--blue);
   font-weight: 700;
 }
-.recovery-link {
-  align-self: flex-start;
-  margin-top: 2px;
-}
 .form-success {
   color: #126f54;
   background: #edf8f3;
@@ -1893,4 +1889,23 @@ select {
   .account-form {
     grid-template-columns: 1fr;
   }
+}
+
+/* Acciones secundarias del acceso: misma paleta y área táctil que el formulario. */
+.login-form .recovery-link,
+.login-form .recovery-back {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  color: var(--blue-dark);
+  background: var(--canvas);
+}
+.login-form .recovery-link:hover:not(:disabled),
+.login-form .recovery-back:hover:not(:disabled) {
+  background: #ebf0f8;
+  border-color: #b9c9e4;
+}
+.login-form .recovery-link:active:not(:disabled),
+.login-form .recovery-back:active:not(:disabled) {
+  transform: translateY(0);
 }

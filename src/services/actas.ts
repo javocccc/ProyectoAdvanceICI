@@ -1,5 +1,5 @@
 import { Upload } from "tus-js-client";
-import { deleteObject, getBlob, getDownloadURL, ref } from "firebase/storage";
+import { deleteObject, getBlob, ref } from "firebase/storage";
 import type { Acta } from "../types/expediente";
 import { auth, storage } from "./firebase";
 import {
@@ -15,15 +15,12 @@ const PREFIJO_SUPABASE = "supabase/";
 
 // La ficha llama a estas funciones; el servicio no decide cuándo mostrar
 // confirmaciones ni guarda por sí solo la ruta del acta en Firestore.
-/** Comprueba extensión, tipo, tamaño y cabecera PDF antes de enviarlo. */
+/** Acepta cualquier formato; conserva límites de nombre y tamaño. */
 export async function validarActa(archivo: File): Promise<string | null> {
-  if (!/\.pdf$/i.test(archivo.name) || archivo.type !== "application/pdf")
-    return "Seleccione un archivo PDF.";
-  if (archivo.size === 0) return "El PDF está vacío.";
-  if (archivo.size >= MAX_BYTES)
-    return `El PDF debe pesar menos de ${MAX_MB} MB.`;
-  if ((await archivo.slice(0, 5).text()) !== "%PDF-")
-    return "El archivo no tiene un formato PDF válido.";
+  if (!archivo.name.trim() || [".", ".."].includes(archivo.name) || archivo.name.length > 200 || /[\/\\\x00-\x1f\x7f]/.test(archivo.name))
+    return "El nombre del archivo debe tener entre 1 y 200 caracteres y no incluir carpetas ni caracteres de control.";
+  if (archivo.size === 0) return "El archivo está vacío.";
+  if (archivo.size >= MAX_BYTES) return `El archivo debe pesar menos de ${MAX_MB} MB.`;
   return null;
 }
 
@@ -33,7 +30,10 @@ export async function subirActa(
   archivo: File,
   alProgresar: (porcentaje: number) => void,
 ): Promise<Acta> {
-  // En demostración solo se guarda el nombre; el PDF no va a un servidor.
+  const error = await validarActa(archivo);
+  if (error) throw new Error(error);
+  if (!expedienteId || /[\/\\\x00-\x1f]/.test(expedienteId)) throw new Error("El expediente no es válido.");
+  // En demostración solo se guarda el nombre; el archivo no va a un servidor.
   if (!auth) {
     alProgresar(100);
     return {
@@ -44,7 +44,9 @@ export async function subirActa(
   }
   exigirSupabase();
   const token = await tokenFirebaseParaActas();
-  const objeto = `${expedienteId}/${crypto.randomUUID()}.pdf`;
+  const punto = archivo.name.lastIndexOf(".");
+  const extension = punto > 0 ? archivo.name.slice(punto) : "";
+  const objeto = `${expedienteId}/${crypto.randomUUID()}${extension}`;
   await new Promise<void>((resolve, reject) => {
     const subida = new Upload(archivo, {
       endpoint: endpointSubida(),
@@ -53,7 +55,7 @@ export async function subirActa(
       metadata: {
         bucketName: bucketActas,
         objectName: objeto,
-        contentType: "application/pdf",
+        contentType: archivo.type || "application/octet-stream",
       },
       chunkSize: 6 * 1024 * 1024,
       uploadDataDuringCreation: true,
@@ -80,21 +82,7 @@ function rutaSupabase(acta: Acta): string {
   return acta.ruta.slice(PREFIJO_SUPABASE.length);
 }
 
-/** Obtiene una URL temporal de Supabase o de un acta antigua de Firebase. */
-export async function urlActa(acta: Acta): Promise<string> {
-  if (acta.ruta.startsWith(PREFIJO_SUPABASE)) {
-    const { data, error } = await exigirSupabase()
-      .storage.from(bucketActas)
-      .createSignedUrl(rutaSupabase(acta), 60);
-    if (error) throw error;
-    return data.signedUrl;
-  }
-  if (storage && acta.ruta.startsWith("actas/"))
-    return getDownloadURL(ref(storage, acta.ruta));
-  throw new Error("El acta de demostración no tiene un archivo persistente.");
-}
-
-/** Obtiene los bytes del PDF; la ficha crea un enlace con el nombre original. */
+/** Obtiene los bytes del archivo; la ficha crea un enlace con el nombre original. */
 export async function blobActa(acta: Acta): Promise<Blob> {
   if (acta.ruta.startsWith(PREFIJO_SUPABASE)) {
     const { data, error } = await exigirSupabase()

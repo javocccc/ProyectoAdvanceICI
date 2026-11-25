@@ -1,10 +1,10 @@
+import { recuperarClave } from "../services/recuperacionClave";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   browserLocalPersistence,
   browserSessionPersistence,
   onAuthStateChanged,
-  sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
@@ -155,13 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const demo: UsuarioSesion = { id: "administrador-demo", email, nombre: "Administrador ICI", rol: "administrador" };
     sessionStorage.setItem(CLAVE_SESION_DEMO, JSON.stringify(demo));
     setUsuario(demo);
-  }
-
-  async function recuperarClave(email: string) {
-    if (!auth) {
-      throw new Error("La recuperación de contraseña requiere que Firebase esté configurado.");
-    }
-    await sendPasswordResetEmail(auth, email);
   }
 
   /** Cierra la sesión y hace que App vuelva a mostrar LoginPage. */

@@ -72,7 +72,7 @@ describe("ficha por rol", () => {
     expect(htmlCoordinador.match(/Reservado para Administración/g)).toHaveLength(2);
     expect(htmlCoordinador).not.toContain("Reservado para Coordinación y Administración");
     expect(htmlCoordinador).toContain("acta-camila-demo.pdf");
-    expect(htmlCoordinador).toContain("Elegir o arrastrar un PDF");
+    expect(htmlCoordinador).toContain("Elegir o arrastrar un archivo");
   });
 
   it("reserva las funciones de gestión a Estudiante", () => {
@@ -88,7 +88,7 @@ describe("ficha por rol", () => {
       expect(html).toContain("Reservado para Administración");
       expect(html).toContain("Reservado para Coordinación y Administración");
       expect(html).not.toContain("acta-camila-demo.pdf");
-      expect(html).not.toContain("Elegir o arrastrar un PDF");
+      expect(html).not.toContain("Elegir o arrastrar un archivo");
     }
   });
 
@@ -102,6 +102,6 @@ describe("ficha por rol", () => {
       />,
     );
     expect(html).not.toContain("Reservado para Administración");
-    expect(html).toContain("Elegir o arrastrar un PDF");
+    expect(html).toContain("Elegir o arrastrar un archivo");
   });
 });

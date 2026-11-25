@@ -10,11 +10,11 @@ service firebase.storage {
     }
 
     match /actas/{expedienteId}/{nombreArchivo} {
-      // Solo se aceptan PDF menores a 10 MB, además del control de la interfaz.
+      // Cualquier formato no vacío de menos de 10 MB; se mantienen los permisos.
       allow read: if puedeGestionarActas();
       allow create, update: if puedeGestionarActas()
         && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType == 'application/pdf';
+        && request.resource.size > 0;
       allow delete: if puedeGestionarActas();
     }
   }

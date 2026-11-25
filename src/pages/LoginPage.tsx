@@ -27,6 +27,7 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
   /** Evita el envío normal del navegador y espera el resultado del ingreso. */
   async function manejarIngreso(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    if (enviando) return;
     setError("");
     setEnviando(true);
     try {
@@ -48,6 +49,7 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
 
   async function manejarRecuperacion(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    if (enviando || mensaje) return;
     setError("");
     setMensaje("");
     setEnviando(true);
@@ -59,7 +61,11 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
       setError(
         codigo === "auth/invalid-email"
           ? "Ingrese un correo electrónico válido."
-          : "No se pudo enviar el correo de recuperación. Intente nuevamente o contacte a soporte.",
+          : codigo === "auth/too-many-requests"
+            ? "Se realizaron demasiados intentos. Espere unos minutos y vuelva a intentarlo."
+            : codigo === "auth/network-request-failed"
+              ? "No se pudo conectar. Revise su conexión y vuelva a intentarlo."
+              : "No se pudo enviar el correo de recuperación. Intente nuevamente o contacte a soporte.",
       );
     } finally {
       setEnviando(false);
@@ -118,15 +124,18 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
           )}
 
           {recuperando ? (
-            <form onSubmit={manejarRecuperacion} className="login-form">
+            <form key="recuperacion" onSubmit={manejarRecuperacion} className="login-form" aria-busy={enviando}>
               <label htmlFor="recovery-email">Correo electrónico</label>
               <input
                 id="recovery-email"
+                autoFocus
+                disabled={enviando}
+                maxLength={254}
                 type="email"
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setMensaje(""); setError(""); }}
                 placeholder="nombre@universidad.cl"
               />
               {error && (
@@ -142,12 +151,13 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
               <button
                 className="button button-primary login-submit"
                 type="submit"
-                disabled={enviando}
+                disabled={enviando || Boolean(mensaje)}
               >
                 {enviando ? "Enviando…" : "Enviar instrucciones"}
               </button>
               <button
-                className="inline-action"
+                className="button button-secondary recovery-back"
+                disabled={enviando}
                 type="button"
                 onClick={() => {
                   setRecuperando(false);
@@ -159,7 +169,7 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
               </button>
             </form>
           ) : (
-            <form onSubmit={manejarIngreso} className="login-form">
+            <form key="ingreso" onSubmit={manejarIngreso} className="login-form">
               <label htmlFor="email">Correo electrónico</label>
               <input
                 id="email"
@@ -205,9 +215,12 @@ export function LoginPage({ statusWarning }: LoginPageProps) {
               </button>
               {firebaseConfigurado && (
                 <button
-                  className="inline-action recovery-link"
+                  className="button button-secondary recovery-link"
+                  disabled={enviando}
                   type="button"
                   onClick={() => {
+                    setClave("");
+                    setMensaje("");
                     setRecuperando(true);
                     setError("");
                   }}

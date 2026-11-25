@@ -8,7 +8,6 @@ import {
   borrarActa,
   blobActa,
   subirActa,
-  urlActa,
   validarActa,
 } from "../services/actas";
 import { actualizarExpediente, listarAuditoriaExpediente } from "../services/expedientes";
@@ -28,7 +27,7 @@ interface DetalleProps {
   alEditar: () => void;
 }
 
-/** Crea un enlace temporal del navegador para descargar un PDF con su nombre original. */
+/** Crea un enlace temporal del navegador para descargar un archivo con su nombre original. */
 function descargarBlob(blob: Blob, nombre: string) {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
@@ -79,7 +78,7 @@ export function ExpedienteDetallePage({
   const [exportando, setExportando] = useState(false);
   const [errorExportacion, setErrorExportacion] = useState("");
   // useRef conserva valores entre renders sin causar otro render. La URL
-  // temporal del PDF demo desaparece al cerrar o cambiar de ficha.
+  // temporal del archivo demo desaparece al cerrar o cambiar de ficha.
   const demoUrl = useRef<string | null>(null);
   // Las operaciones de red pueden terminar después de abrir otra ficha.
   // Comparamos este id antes de escribir mensajes en la pantalla visible.
@@ -100,7 +99,7 @@ export function ExpedienteDetallePage({
     setProgreso(0);
     setErrorActa("");
     setMensajeActa("");
-    // Cada URL temporal apunta al PDF de una ficha; se libera al cambiar o cerrar.
+    // Cada URL temporal apunta al archivo de una ficha; se libera al cambiar o cerrar.
     return () => {
       if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
       demoUrl.current = null;
@@ -145,7 +144,7 @@ export function ExpedienteDetallePage({
     }
   }
 
-  /** Prepara el PDF elegido y limpia avisos de una selección anterior. */
+  /** Prepara el archivo elegido y limpia avisos de una selección anterior. */
   function elegirArchivo(nuevo: File | null) {
     setArchivo(nuevo);
     setConfirmarReemplazo(false);
@@ -157,10 +156,11 @@ export function ExpedienteDetallePage({
   /** El arrastre usa la misma selección que el botón de elegir archivo. */
   function soltarArchivo(evento: DragEvent<HTMLLabelElement>) {
     evento.preventDefault();
+    if (subiendo || eliminando) return;
     elegirArchivo(evento.dataTransfer.files[0] ?? null);
   }
 
-  /** Valida el PDF, pide confirmación si reemplaza uno y guarda su referencia. */
+  /** Valida el archivo, pide confirmación si reemplaza uno y guarda su referencia. */
   async function guardarArchivo() {
     if (!archivo || subiendo || eliminando || !usuario || !puedeGestionarActas) return;
     const expedienteId = actual.id;
@@ -181,7 +181,7 @@ export function ExpedienteDetallePage({
     setProgreso(0);
     let subida: Awaited<ReturnType<typeof subirActa>> | null = null;
     try {
-      // Primero subimos el PDF y luego guardamos su ruta en la ficha.
+      // Primero subimos el archivo y luego guardamos su ruta en la ficha.
       // Si falla Firestore, el bloque catch intenta borrar la subida huérfana.
       subida = await subirActa(expedienteId, archivoElegido, (porcentaje) => {
         if (expedienteVisibleId.current === expedienteId) {
@@ -198,7 +198,7 @@ export function ExpedienteDetallePage({
             : previo,
         );
         if (demoUrl.current) URL.revokeObjectURL(demoUrl.current);
-        // En demo el PDF vive solo en memoria; el servicio guarda su nombre.
+        // En demo el archivo vive solo en memoria; el servicio guarda su nombre.
         demoUrl.current = actaGuardada.ruta.startsWith("demo/")
           ? URL.createObjectURL(archivoElegido)
           : null;
@@ -208,7 +208,7 @@ export function ExpedienteDetallePage({
         setConfirmarReemplazo(false);
         setMensajeActa(
           actaGuardada.ruta.startsWith("demo/")
-            ? "PDF disponible solo mientras mantenga abierta esta ficha. La demostración no respalda archivos."
+            ? "Archivo disponible solo mientras mantenga abierta esta ficha. La demostración no respalda archivos."
             : "Acta guardada en Supabase Storage.",
         );
       }
@@ -248,7 +248,7 @@ export function ExpedienteDetallePage({
     }
   }
 
-  /** Quita la referencia primero para no dejar la ficha apuntando a un PDF borrado. */
+  /** Quita la referencia primero para no dejar la ficha apuntando a un archivo borrado. */
   async function eliminarArchivo() {
     if (!actual.acta || eliminando || subiendo || !usuario || !puedeGestionarActas) return;
     const expedienteId = actual.id;
@@ -270,12 +270,12 @@ export function ExpedienteDetallePage({
       try {
         await borrarActa(actaAnterior);
         if (expedienteVisibleId.current === expedienteId) {
-          setMensajeActa("Acta eliminada. Ya puede subir otro PDF.");
+          setMensajeActa("Acta eliminada. Ya puede subir otro archivo.");
         }
       } catch {
         if (expedienteVisibleId.current === expedienteId) {
           setErrorActa(
-            "Se quitó el acta del expediente, pero no se pudo borrar el PDF del almacenamiento.",
+            "Se quitó el acta del expediente, pero no se pudo borrar el archivo del almacenamiento.",
           );
         }
       }
@@ -297,11 +297,28 @@ export function ExpedienteDetallePage({
     const ventana = window.open("", "_blank");
     if (ventana) ventana.opener = null;
     try {
-      const url = demoUrl.current ?? (await urlActa(actual.acta));
+      const blob = demoUrl.current
+        ? await (await fetch(demoUrl.current)).blob()
+        : await blobActa(actual.acta);
+      // Solo se previsualizan formatos pasivos con un MIME fijado por la aplicación.
+      // HTML, SVG y otros formatos se descargan sin ejecutarlos en el origen del sitio.
+      const tipos: Record<string, string> = {
+        pdf: "application/pdf", png: "image/png", jpg: "image/jpeg",
+        jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+      };
+      const extension = actual.acta.nombre.split(".").pop()?.toLowerCase() ?? "";
+      const tipo = Object.hasOwn(tipos, extension) ? tipos[extension] : undefined;
+      if (!tipo) {
+        ventana?.close();
+        descargarBlob(blob, actual.acta.nombre);
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([blob], { type: tipo }));
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       if (ventana) ventana.location.href = url;
       else
         setErrorActa(
-          "El navegador bloqueó la ventana del PDF. Permita ventanas emergentes para este sitio.",
+          "El navegador bloqueó la ventana del archivo. Permita ventanas emergentes para este sitio.",
         );
     } catch (problema) {
       ventana?.close();
@@ -349,7 +366,7 @@ export function ExpedienteDetallePage({
           acta: actual.acta ?? null,
           historialAuditoria,
         },
-        nota: "Los archivos PDF no están incluidos en este JSON; deben descargarse por separado desde la ficha si la cuenta tiene permiso.",
+        nota: "Los archivos adjuntos no están incluidos en este JSON; deben descargarse por separado desde la ficha si la cuenta tiene permiso.",
       };
       const blob = new Blob([JSON.stringify(exportacion, null, 2)], { type: "application/json;charset=utf-8" });
       descargarBlob(blob, `expediente-${actual.id}.json`);
@@ -537,18 +554,18 @@ export function ExpedienteDetallePage({
                   onClick={() => setConfirmarEliminacion(true)}
                   disabled={subiendo || eliminando}
                 >
-                  Eliminar PDF
+                  Eliminar archivo
                 </button>
               </div>
             )}
             {puedeGestionarActas && confirmarEliminacion && actual.acta && (
-              <div className="confirmar-acta" role="group" aria-label="Confirmar eliminación del PDF">
-                <p>¿Eliminar el PDF actual? Podrá subir otro después.</p>
+              <div className="confirmar-acta" role="group" aria-label="Confirmar eliminación del archivo">
+                <p>¿Eliminar el archivo actual? Podrá subir otro después.</p>
                 <button className="button button-secondary" type="button" onClick={() => setConfirmarEliminacion(false)} disabled={eliminando}>
                   Cancelar
                 </button>
                 <button className="button button-danger" type="button" onClick={() => void eliminarArchivo()} disabled={eliminando}>
-                  {eliminando ? "Eliminando…" : "Sí, eliminar PDF"}
+                  {eliminando ? "Eliminando…" : "Sí, eliminar archivo"}
                 </button>
               </div>
             )}
@@ -556,17 +573,16 @@ export function ExpedienteDetallePage({
               className="acta-dropzone"
               htmlFor="archivo-acta"
               onDragOver={(e) => e.preventDefault()}
-              onDrop={eliminando ? undefined : soltarArchivo}
+              onDrop={subiendo || eliminando ? undefined : soltarArchivo}
             >
               <Icon name="file" size={23} />
               <strong>
-                {archivo ? archivo.name : "Elegir o arrastrar un PDF"}
+                {archivo ? archivo.name : "Elegir o arrastrar un archivo"}
               </strong>
-              <span>PDF de menos de 10 MB</span>
+              <span>Cualquier formato · Menos de 10 MB</span>
               <input
                 id="archivo-acta"
                 type="file"
-                accept="application/pdf,.pdf"
                 disabled={subiendo || eliminando}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
                   elegirArchivo(e.target.files?.[0] ?? null);

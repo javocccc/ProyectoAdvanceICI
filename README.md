@@ -7,7 +7,7 @@ gestionar el estado de colegiatura y respaldar actas de examen.
 
 - Node.js 22 o superior y npm.
 - Para login y expedientes: Firebase Authentication y Cloud Firestore.
-- Para PDFs: un proyecto Supabase Storage. Firebase sigue gestionando el login
+- Para archivos de actas: un proyecto Supabase Storage. Firebase sigue gestionando el login
   y Firestore los expedientes; no hace falta Firebase Storage ni Blaze.
 - Para publicar reglas de Firestore: Firebase CLI.
 
@@ -206,9 +206,9 @@ disponible en el modo de demostración.
    desde `functions/`. El verificador sube un PDF sintético, comprueba que una
    visita sin sesión no puede descargarlo y elimina el archivo al terminar.
 
-Los PDFs nuevos se suben directamente desde el navegador a Supabase con el
+Los archivos nuevos se suben directamente desde el navegador a Supabase con el
 token Firebase, usando TUS para mostrar el progreso. El bucket admite solo
-PDFs de menos de 10 MB. Firestore guarda la ruta `supabase/<expediente>/<id>`;
+archivos de cualquier formato, no vacíos y de menos de 10 MB. Firestore guarda la ruta `supabase/<expediente>/<id>`;
 las descargas utilizan el bucket privado y una URL temporal al abrir el acta.
 Si ya existían actas en Firebase Storage, la aplicación conserva la lectura
 y eliminación de esas rutas `actas/...` siempre que el bucket antiguo siga
@@ -240,7 +240,7 @@ se publica por separado; `firebase.json` aún no configura Firebase Hosting.
   El correo de soporte y el canal de privacidad también están pendientes de
   definición.
 - Las fichas ofrecen una exportación JSON con los datos del expediente y su
-  historial de cambios. El PDF del acta es un archivo separado y debe
+  historial de cambios. El archivo del acta es un archivo separado y debe
   descargarse aparte, según los permisos actuales de la cuenta.
 - Administración cuenta con la pantalla **Control y auditoría**. El registro agrega
   una entrada al abrir una ficha desde la aplicación y muestra usuario,
@@ -304,3 +304,21 @@ Las pruebas unitarias no sustituyen una prueba de integración con Firebase.
 Antes de producción, prueba en un proyecto de desarrollo la autenticación, las
 reglas, creación/edición de expedientes, búsqueda paginada, auditoría y carga
 de actas.
+
+### Aplicar la actualización de actas
+
+Ejecute nuevamente `supabase/actas.sql`: elimina la restricción MIME del bucket y la
+condición de extensión PDF de la política de subida. El bucket sigue siendo privado.
+Publique `storage.rules` si también utiliza Firebase Storage. Las actas ya existentes
+siguen siendo compatibles. El frontend y el backend Django permanecen separados.
+
+La recuperación usa Firebase Authentication con idioma español. Valida el correo,
+bloquea envíos simultáneos y muestra errores de conexión o exceso de intentos.
+La respuesta no revela si la cuenta existe. Tras enviar, puede volver al inicio de
+sesión o cambiar el correo para solicitar instrucciones para otra cuenta.
+La entrega real y el enlace del correo deben comprobarse con una cuenta de prueba
+del proyecto y la plantilla de restablecimiento configurada en Firebase.
+
+La acción Abrir previsualiza PDF e imágenes compatibles con un MIME definido
+por la aplicación. Los demás formatos, incluidos HTML y SVG, se descargan
+con su nombre original.

@@ -129,7 +129,10 @@ function validarActa(valor: unknown, expedienteId: string): Acta {
     ruta: exigirTexto(valor.ruta, "ruta del acta", 500),
     fechaCarga: exigirTexto(valor.fechaCarga, "fecha de carga", 50),
   };
-  if (!acta.ruta.startsWith(`actas/${expedienteId}/`)) {
+  const prefijo = [`actas/${expedienteId}/`, `supabase/${expedienteId}/`]
+    .find((ruta) => acta.ruta.startsWith(ruta));
+  const nombreObjeto = prefijo ? acta.ruta.slice(prefijo.length) : "";
+  if (!prefijo || !nombreObjeto || nombreObjeto === "." || nombreObjeto === ".." || /[\/\\\x00-\x1f]/.test(nombreObjeto)) {
     throw new HttpsError("invalid-argument", "La ruta del acta no corresponde al expediente.");
   }
   return acta;
@@ -295,7 +298,7 @@ function validarCambios(
         cambios.colegiatura = dato;
         break;
       case "acta":
-        cambios.acta = validarActa(dato, expedienteId);
+        cambios.acta = dato === null ? null : validarActa(dato, expedienteId);
         break;
     }
   }
@@ -438,7 +441,7 @@ export const actualizarExpediente = onCall(async (request) => {
         );
       }
       if (nuevosCambios.acta !== undefined) {
-        nuevosCambios.actaPendiente = false;
+        nuevosCambios.actaPendiente = nuevosCambios.acta === null;
       }
     }
 
