@@ -15,11 +15,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      artifact_name: ${{ steps.artifact-name.outputs.name }}
     steps:
       - name: Obtener código
         uses: actions/checkout@v4
@@ -48,11 +49,28 @@ jobs:
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Identificar archivo de despliegue
+        id: artifact-name
+        run: echo "name=github-pages-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
       - name: Subir sitio compilado
         uses: actions/upload-pages-artifact@v4
         with:
+          name: ${{ steps.artifact-name.outputs.name }}
           path: dist
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Publicar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact_name }}
